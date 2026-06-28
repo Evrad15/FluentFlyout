@@ -1130,6 +1130,8 @@ public partial class MainWindow : MicaWindow
                 if (dominantColors.Count > 0)
                 {
                     Color colorStart = dominantColors[0].Color;
+                    ControlPlayPause.Background = dominantColors[0]; // Forcer la couleur du bouton Play/Pause
+                    
                     Color colorEnd = dominantColors.Count > 1 
                         ? dominantColors[1].Color 
                         : Color.FromArgb(0, colorStart.R, colorStart.G, colorStart.B);
