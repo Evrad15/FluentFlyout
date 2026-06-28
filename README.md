@@ -20,6 +20,18 @@
 FluentFlyout is the modern Flyout app for Windows, built with Fluent 2 Design principles.  
 The UI seemingly blends in with Windows 11, providing you an uninterrupted, clean, and native-like experience when controlling your media, lock keys, and more.  
 
+> [!NOTE]
+> **Version Personnalisée / Custom Fork** 🚀
+> 
+> Cette version est un fork personnalisé comportant les modifications suivantes :
+> - **Correction de lisibilité (Mode Clair)** : Les textes du titre, de l'artiste et des durées de lecture, ainsi que les boutons, sont forcés en noir pour être parfaitement visibles sur fond clair.
+> - **Arrière-plan en dégradé dynamique** : L'arrière-plan du flyout applique désormais un dégradé linéaire basé sur les deux couleurs dominantes de la pochette d'album de la musique en lecture.
+> - **Couleur du bouton Play/Pause** : Le fond carré du bouton Play/Pause s'adapte automatiquement à la couleur principale de l'album.
+>
+> **Télécharger / Lancer le `.exe` :**
+> Vous pouvez lancer directement l'exécutable pré-compilé sans installation depuis :
+> [FluentFlyoutWPF/bin/Debug/net10.0-windows10.0.22000.0/FluentFlyout.exe](FluentFlyoutWPF/bin/Debug/net10.0-windows10.0.22000.0/FluentFlyout.exe)
+
 FluentFlyout features smooth animations, blends with your system's color themes and includes a suite of personalization settings while providing media controls, information and more in nice and modern looking popup flyouts.
 
 <a href="https://apps.microsoft.com/detail/9n45nsm4tnbp?referrer=appbadge&cid=GitHub_README&mode=direct">
