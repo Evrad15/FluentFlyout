@@ -997,6 +997,7 @@ public partial class MainWindow : MicaWindow
                 SongTitle.Text = "No media playing";
                 SongArtist.Text = string.Empty;
                 SongImage.ImageSource = null;
+                BackgroundGrid.Background = null;
                 SymbolPlayPause.Symbol = Wpf.Ui.Controls.SymbolRegular.Stop16;
                 ControlPlayPause.IsEnabled = false;
                 ControlPlayPause.Opacity = 0.35;
@@ -1123,6 +1124,26 @@ public partial class MainWindow : MicaWindow
                 SongArtist.Text = songInfo.Artist;
                 var image = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
                 SongImage.ImageSource = image;
+
+                // Extraire et appliquer les couleurs dominantes pour le dégradé de fond
+                var dominantColors = BitmapHelper.GetDominantColors(2, 15, true);
+                if (dominantColors.Count > 0)
+                {
+                    Color colorStart = dominantColors[0].Color;
+                    Color colorEnd = dominantColors.Count > 1 
+                        ? dominantColors[1].Color 
+                        : Color.FromArgb(0, colorStart.R, colorStart.G, colorStart.B);
+                    
+                    var gradientBrush = new LinearGradientBrush(colorStart, colorEnd, new Point(0, 0), new Point(1, 1))
+                    {
+                        Opacity = 0.85
+                    };
+                    BackgroundGrid.Background = gradientBrush;
+                }
+                else
+                {
+                    BackgroundGrid.Background = null;
+                }
 
                 // set tooltip
                 SongInfoStackPanel.ToolTip = string.Empty;

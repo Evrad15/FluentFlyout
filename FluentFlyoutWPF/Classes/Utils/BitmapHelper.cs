@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2024-2026 The FluentFlyout Authors
+// Copyright (c) 2024-2026 The FluentFlyout Authors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using FluentFlyout.Classes.Settings;
@@ -186,11 +186,11 @@ internal static class BitmapHelper
     /// <param name="colorCount">Amount of colors needed</param>
     /// <param name="maxIterations">Amount of k-means iterations (more = higher accuracy)</param>
     /// <returns>List of dominant colors from cached Bitmap as SolidColorBrush</returns>
-    public static List<SolidColorBrush> GetDominantColors(int colorCount, int maxIterations = 15)
+    public static List<SolidColorBrush> GetDominantColors(int colorCount, int maxIterations = 15, bool forceAlbumArt = false)
     {
         int hashCode = _currentHashCodeContext.Value != 0 ? _currentHashCodeContext.Value : _currentHashCode;
 
-        if (!SettingsManager.Current.UseAlbumArtAsAccentColor || hashCode == 0)
+        if ((!SettingsManager.Current.UseAlbumArtAsAccentColor && !forceAlbumArt) || hashCode == 0)
         {
             // control color (buttons, etc.)
             var accent = (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorSecondary");
