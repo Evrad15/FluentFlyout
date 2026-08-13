@@ -24,6 +24,7 @@ public static class MediaPlayerData
     private static Process[]? cachedProcesses = null;
     private static DateTime lastCacheTime = DateTime.MinValue;
     private const int CACHE_DURATION_SECONDS = 5;
+    private static readonly Lock _processCacheLock = new();
 
     public static (string, ImageSource?) GetAndCacheMediaPlayerData(string mediaPlayerId)
     {
@@ -53,14 +54,16 @@ public static class MediaPlayerData
 
         Process[] processes;
 
-        // use cache to avoid frequent process enumeration
-        if (cachedProcesses == null || (DateTime.Now - lastCacheTime).TotalSeconds > CACHE_DURATION_SECONDS)
+        // use cache to avoid frequent process enumeration (lock ensures thread-safety)
+        lock (_processCacheLock)
         {
-            cachedProcesses = Process.GetProcesses();
-            lastCacheTime = DateTime.Now;
+            if (cachedProcesses == null || (DateTime.Now - lastCacheTime).TotalSeconds > CACHE_DURATION_SECONDS)
+            {
+                cachedProcesses = Process.GetProcesses();
+                lastCacheTime = DateTime.Now;
+            }
+            processes = cachedProcesses;
         }
-
-        processes = cachedProcesses;
 
         var processData = processes.Select(p =>
             {

@@ -63,6 +63,23 @@ public static partial class NativeMethods
     internal const int APPCOMMAND_MEDIA_PLAY_PAUSE = 14;
     internal const int FAPPCOMMAND_KEY = 0x0000;
 
+    // Virtual Key Codes — Media
+    internal const int VK_MEDIA_PLAY_PAUSE = 0xB3;
+    internal const int VK_MEDIA_NEXT_TRACK = 0xB0;
+    internal const int VK_MEDIA_PREV_TRACK = 0xB1;
+    internal const int VK_MEDIA_STOP = 0xB2;
+
+    // Virtual Key Codes — Volume
+    internal const int VK_VOLUME_MUTE = 0xAD;
+    internal const int VK_VOLUME_DOWN = 0xAE;
+    internal const int VK_VOLUME_UP = 0xAF;
+
+    // Virtual Key Codes — Lock keys
+    internal const int VK_CAPS_LOCK = 0x14;
+    internal const int VK_NUM_LOCK = 0x90;
+    internal const int VK_SCROLL_LOCK = 0x91;
+    internal const int VK_INSERT = 0x2D;
+
     #endregion
 
     #region Enums
