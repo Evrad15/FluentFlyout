@@ -381,7 +381,7 @@ public partial class TaskbarWidgetControl : UserControl
     {
         try
         {
-            int msDuration = MainWindow.getDuration();
+            int msDuration = MainWindow.GetDuration();
             if (msDuration <= 0) return;
 
             int animMs = Math.Min(msDuration, 200);

@@ -49,6 +49,8 @@
             <ui:SymbolIcon Symbol="Dismiss20" Filled="True" Foreground="Black"/>
         </controls:Button>
         <Grid x:Name="BackgroundGrid">
+            <!-- BackgroundGridOld is used as a snapshot layer during gradient crossfade transitions -->
+            <Grid x:Name="BackgroundGridOld" Opacity="0" IsHitTestVisible="False"/>
             <Image x:Name="BackgroundImageStyle1" Stretch="UniformToFill" Opacity="1" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5" Visibility="Collapsed" ClipToBounds="True">
                 <Image.RenderTransform>
                     <TransformGroup>
@@ -180,23 +182,23 @@
             Margin="0,127,0,114" Visibility="Collapsed">
             <tray:NotifyIcon.Menu>
                 <ContextMenu>
-                    <ui:MenuItem x:Name="NotifyIconSettings" Header="{DynamicResource TrayIcon_SettingsOption}" Click="openSettings">
+                    <ui:MenuItem x:Name="NotifyIconSettings" Header="{DynamicResource TrayIcon_SettingsOption}" Click="OpenSettings">
                         <ui:MenuItem.Icon>
                             <ui:SymbolIcon Symbol="Settings20"/>
                         </ui:MenuItem.Icon>
                     </ui:MenuItem>
                     <Separator></Separator>
-                    <ui:MenuItem x:Name="NotifyIconRepository" Header="{DynamicResource TrayIcon_GitHubRepositoryOption}" Click="openRepository">
+                    <ui:MenuItem x:Name="NotifyIconRepository" Header="{DynamicResource TrayIcon_GitHubRepositoryOption}" Click="OpenRepository">
                         <ui:MenuItem.Icon>
                             <ui:SymbolIcon Symbol="DocumentChevronDouble20"/>
                         </ui:MenuItem.Icon>
                     </ui:MenuItem>
-                    <ui:MenuItem x:Name="NotifyIconViewLogs" Header="{DynamicResource TrayIcon_ViewLogsOption}" Click="openLogsFolder">
+                    <ui:MenuItem x:Name="NotifyIconViewLogs" Header="{DynamicResource TrayIcon_ViewLogsOption}" Click="OpenLogsFolder">
                         <ui:MenuItem.Icon>
                             <ui:SymbolIcon Symbol="FolderOpen20"/>
                         </ui:MenuItem.Icon>
                     </ui:MenuItem>
-                    <ui:MenuItem x:Name="NotifyIconReportBug" Header="{DynamicResource TrayIcon_ReportBugOption}" Click="reportBug">
+                    <ui:MenuItem x:Name="NotifyIconReportBug" Header="{DynamicResource TrayIcon_ReportBugOption}" Click="ReportBug">
                         <ui:MenuItem.Icon>
                             <ui:SymbolIcon Symbol="Bug20"/>
                         </ui:MenuItem.Icon>

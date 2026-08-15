@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2024-2026 The FluentFlyout Authors
+// Copyright (c) 2024-2026 The FluentFlyout Authors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using FluentFlyout.Classes;
@@ -58,7 +58,7 @@ public partial class LockWindow : MicaWindow
             double targetShackleAngle = isOn ? 0.0 : 25.0;
             double targetShackleBounceY = 0.0;
 
-            int msDuration = (int)(MainWindow.getDuration() / 1.5);
+            int msDuration = (int)(MainWindow.GetDuration() / 1.5);
 
             if (SettingsManager.Current.LockKeysAnimated)
             {
@@ -158,7 +158,7 @@ public partial class LockWindow : MicaWindow
                 await Task.Delay(SettingsManager.Current.LockKeysDuration, token);
                 _mainWindow.CloseAnimation(window: this, selectedMonitor: _openedMonitor);
                 _isHiding = true;
-                await Task.Delay(MainWindow.getDuration());
+                await Task.Delay(MainWindow.GetDuration());
                 if (_isHiding == false) return;
 
                 WindowHelper.SetVisibility(this, false);

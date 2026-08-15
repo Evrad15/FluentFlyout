@@ -1,4 +1,4 @@
-ï»¿// Copyright (c) 2024-2026 The FluentFlyout Authors
+// Copyright (c) 2024-2026 The FluentFlyout Authors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Portions of this code are derived from:
@@ -141,7 +141,7 @@ public partial class VolumeMixerWindow : MicaWindow
                     {
                         _mainWindow.CloseAnimation(this);
                         _isHiding = true;
-                        await Task.Delay(MainWindow.getDuration());
+                        await Task.Delay(MainWindow.GetDuration());
                         if (_isHiding == false) return;
 
                         WindowHelper.SetVisibility(this, false);
@@ -237,8 +237,8 @@ public partial class VolumeMixerWindow : MicaWindow
 
     private void AnimateExpandCollapse(bool expand)
     {
-        int msDuration = MainWindow.getDuration();
-        var easing = msDuration > 0 ? _mainWindow.getEasingStyle(true) : null;
+        int msDuration = MainWindow.GetDuration();
+        var easing = msDuration > 0 ? _mainWindow.GetEasingStyle(true) : null;
         var duration = new Duration(TimeSpan.FromMilliseconds(msDuration > 0 ? msDuration / 1.4 : 1));
 
         bool isTop = false;
@@ -269,8 +269,8 @@ public partial class VolumeMixerWindow : MicaWindow
         double currentHeight = ActualHeight;
         double heightDelta = targetHeight - currentHeight;
 
-        // When at the top, chevron points down (0Â°) when collapsed and up (180Â°) when expanded.
-        // When at the bottom, chevron points up (180Â°) when expanded and down (0Â°) when collapsed.
+        // When at the top, chevron points down (0°) when collapsed and up (180°) when expanded.
+        // When at the bottom, chevron points up (180°) when expanded and down (0°) when collapsed.
         var chevronAnimation = new DoubleAnimation
         {
             To = isTop ? (expand ? 0 : 180) : (expand ? 180 : 0),

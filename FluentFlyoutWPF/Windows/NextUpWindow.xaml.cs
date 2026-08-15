@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2024-2026 The FluentFlyout Authors
+// Copyright (c) 2024-2026 The FluentFlyout Authors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using FluentFlyout.Classes;
@@ -55,7 +55,7 @@ public partial class NextUpWindow : MicaWindow
         {
             await Task.Delay(SettingsManager.Current.NextUpDuration);
             mainWindow.CloseAnimation(this);
-            await Task.Delay(MainWindow.getDuration());
+            await Task.Delay(MainWindow.GetDuration());
             Close();
         }
 
