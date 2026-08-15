@@ -146,13 +146,28 @@ public partial class MainWindow
             }
             SongImage.ImageSource = displayImage;
 
-            // Apply dominant-color to Play/Pause button
-            var dominantColors = BitmapHelper.GetDominantColors(1, 15, true);
+            // Apply dominant-color gradient with animated crossfade
+            var dominantColors = BitmapHelper.GetDominantColors(2, 15, true);
             if (dominantColors.Count > 0)
             {
                 ControlPlayPause.Background = dominantColors[0];
+
+                Color colorStart = dominantColors[0].Color;
+                Color colorEnd   = dominantColors.Count > 1
+                    ? dominantColors[1].Color
+                    : Color.FromArgb(colorStart.A, (byte)(colorStart.R * 0.65), (byte)(colorStart.G * 0.65), (byte)(colorStart.B * 0.65));
+
+                var newBrush = new LinearGradientBrush(colorStart, colorEnd, new Point(0, 0), new Point(1, 1))
+                {
+                    Opacity = 0.85
+                };
+
+                ApplyGradientWithTransition(newBrush);
             }
-            BackgroundGrid.Background = null;
+            else
+            {
+                BackgroundGrid.Background = null;
+            }
 
             // tooltip
             SongInfoStackPanel.ToolTip = string.Empty;
