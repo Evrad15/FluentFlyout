@@ -28,9 +28,13 @@ public static class MediaPlayerData
 
     public static (string, ImageSource?) GetAndCacheMediaPlayerData(string mediaPlayerId)
     {
-        if (mediaPlayerCache.TryGetValue(mediaPlayerId, out var cachedInfo)
-            || mediaPlayerIdVariants.TryGetValue(mediaPlayerId, out var variantKey)
-            && mediaPlayerCache.TryGetValue(variantKey, out cachedInfo))
+        if (string.IsNullOrWhiteSpace(mediaPlayerId))
+            return ("Media Player", null);
+
+        if ((mediaPlayerCache.TryGetValue(mediaPlayerId, out var cachedInfo)
+            || (mediaPlayerIdVariants.TryGetValue(mediaPlayerId, out var variantKey)
+            && mediaPlayerCache.TryGetValue(variantKey, out cachedInfo)))
+            && cachedInfo?.Icon != null)
         {
             return (cachedInfo.Title, cachedInfo.Icon);
         }
@@ -38,23 +42,61 @@ public static class MediaPlayerData
         string mediaTitle = mediaPlayerId;
         ImageSource? mediaIcon = null;
 
-        // get sanitized media title name
-        string[] mediaSessionIdVariants = mediaPlayerId.Split('.');
+        // Split into informative tokens: "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify" -> ["SpotifyAB", "SpotifyMusic", "Spotify"]
+        var tokens = mediaPlayerId
+            .Split(['.', '_', '!', ' ', '-', '/', '\\'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(t => t.Trim())
+            .Where(t => !string.Equals(t, "com", StringComparison.OrdinalIgnoreCase)
+                     && !string.Equals(t, "github", StringComparison.OrdinalIgnoreCase)
+                     && !string.Equals(t, "exe", StringComparison.OrdinalIgnoreCase)
+                     && !string.Equals(t, "app", StringComparison.OrdinalIgnoreCase)
+                     && t.Length >= 2)
+            .ToList();
 
-        // remove common non-informative substrings
-        var variants = mediaSessionIdVariants.Select(variant =>
-            variant.Replace("com", "", StringComparison.OrdinalIgnoreCase)
-                   .Replace("github", "", StringComparison.OrdinalIgnoreCase)
-                   .Replace("exe", "", StringComparison.OrdinalIgnoreCase)
-                   .Trim()
-        ).Where(variant => !string.IsNullOrWhiteSpace(variant)).ToList();
+        string simpleName = mediaPlayerId.Replace(".exe", "", StringComparison.OrdinalIgnoreCase).Trim();
+        if (!tokens.Contains(simpleName, StringComparer.OrdinalIgnoreCase))
+            tokens.Add(simpleName);
 
-        // add original id to the end of the array to ensure at least one variant
-        variants.Add(mediaPlayerId);
+        // Fast path: try GetProcessesByName directly for candidate tokens
+        foreach (var token in tokens)
+        {
+            try
+            {
+                var namedProcesses = Process.GetProcessesByName(token);
+                foreach (var p in namedProcesses)
+                {
+                    try
+                    {
+                        var mainModule = p.MainModule;
+                        if (mainModule == null) continue;
+
+                        string path = mainModule.FileName;
+                        string title = !string.IsNullOrWhiteSpace(mainModule.FileVersionInfo.FileDescription)
+                            ? mainModule.FileVersionInfo.FileDescription
+                            : (!string.IsNullOrWhiteSpace(p.MainWindowTitle) ? p.MainWindowTitle : p.ProcessName);
+
+                        mediaIcon = GetIconFromPath(path);
+                        if (mediaIcon != null)
+                        {
+                            mediaTitle = title;
+                            var info = new CachedMediaPlayerInfo
+                            {
+                                Title = mediaTitle,
+                                Icon = mediaIcon,
+                                ProcessId = p.Id
+                            };
+                            mediaPlayerCache[mediaPlayerId] = info;
+                            mediaPlayerCache[mediaTitle] = info;
+                            return (mediaTitle, mediaIcon);
+                        }
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+        }
 
         Process[] processes;
-
-        // use cache to avoid frequent process enumeration (lock ensures thread-safety)
         lock (_processCacheLock)
         {
             if (cachedProcesses == null || (DateTime.Now - lastCacheTime).TotalSeconds > CACHE_DURATION_SECONDS)
@@ -65,68 +107,57 @@ public static class MediaPlayerData
             processes = cachedProcesses;
         }
 
-        var processData = processes.Select(p =>
-            {
-                try
-                {
-                    // Check if process name matches any variant
-                    string procName = p.ProcessName;
-                    bool nameMatches = variants.Any(v => procName.Contains(v, StringComparison.OrdinalIgnoreCase));
-
-                    // If neither name matches nor does it have a window, skip inaccessible background workers
-                    if (!nameMatches && p.MainWindowHandle == IntPtr.Zero)
-                    {
-                        return null;
-                    }
-
-                    var mainModule = p.MainModule;
-                    if (mainModule == null) return null;
-
-                    string path = mainModule.FileName;
-
-                    if (nameMatches || variants.Any(v => path.Contains(v, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        // prioritize the FileDescription for a user-friendly name
-                        // fall back to MainWindowTitle if the description is empty
-                        string title = !string.IsNullOrWhiteSpace(mainModule.FileVersionInfo.FileDescription)
-                                        ? mainModule.FileVersionInfo.FileDescription
-                                        : (!string.IsNullOrWhiteSpace(p.MainWindowTitle) ? p.MainWindowTitle : procName);
-
-                        return new { Title = title, Path = path, ProcessId = p.Id };
-                    }
-                }
-                catch (System.ComponentModel.Win32Exception)
-                {
-                    // silently ignore the exception for inaccessible processes
-                }
-                catch (InvalidOperationException)
-                {
-                    // process may have exited during enumeration
-                }
-                return null;
-            })
-            .FirstOrDefault(data => data != null); // use first result
-
-        if (processData == null) return (mediaTitle, mediaIcon);
-
-        mediaTitle = !string.IsNullOrWhiteSpace(processData.Title) ? processData.Title : mediaPlayerId;
-
-        // check cache again because we have the sanitized title
-        if (mediaPlayerCache.TryGetValue(mediaTitle, out cachedInfo))
+        foreach (var p in processes)
         {
-            // map the original id to the sanitized title for future lookups
-            mediaPlayerIdVariants[mediaPlayerId] = mediaTitle;
-            return (cachedInfo.Title, cachedInfo.Icon);
+            try
+            {
+                string procName = p.ProcessName;
+                bool matches = tokens.Any(t =>
+                    procName.Equals(t, StringComparison.OrdinalIgnoreCase)
+                    || procName.Contains(t, StringComparison.OrdinalIgnoreCase)
+                    || t.Contains(procName, StringComparison.OrdinalIgnoreCase));
+
+                if (!matches && p.MainWindowHandle == IntPtr.Zero)
+                    continue;
+
+                var mainModule = p.MainModule;
+                if (mainModule == null) continue;
+
+                string path = mainModule.FileName;
+                if (matches || tokens.Any(t => path.Contains(t, StringComparison.OrdinalIgnoreCase)))
+                {
+                    string title = !string.IsNullOrWhiteSpace(mainModule.FileVersionInfo.FileDescription)
+                        ? mainModule.FileVersionInfo.FileDescription
+                        : (!string.IsNullOrWhiteSpace(p.MainWindowTitle) ? p.MainWindowTitle : procName);
+
+                    mediaIcon = GetIconFromPath(path);
+                    if (mediaIcon != null)
+                    {
+                        mediaTitle = title;
+                        var info = new CachedMediaPlayerInfo
+                        {
+                            Title = mediaTitle,
+                            Icon = mediaIcon,
+                            ProcessId = p.Id
+                        };
+                        mediaPlayerCache[mediaPlayerId] = info;
+                        mediaPlayerCache[mediaTitle] = info;
+                        return (mediaTitle, mediaIcon);
+                    }
+                }
+            }
+            catch { }
         }
 
-        mediaIcon = GetIconFromPath(processData.Path);
-
-        mediaPlayerCache[mediaPlayerId] = new CachedMediaPlayerInfo
+        if (mediaIcon != null)
         {
-            Title = mediaTitle,
-            Icon = mediaIcon,
-            ProcessId = processData.ProcessId
-        };
+            mediaPlayerCache[mediaPlayerId] = new CachedMediaPlayerInfo
+            {
+                Title = mediaTitle,
+                Icon = mediaIcon,
+                ProcessId = 0
+            };
+        }
 
         return (mediaTitle, mediaIcon);
     }
