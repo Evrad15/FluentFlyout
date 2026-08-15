@@ -467,9 +467,15 @@ namespace FluentFlyoutWPF.Classes
         private unsafe void DrawBars(int stride, Span<byte> buffer)
         {
             // Resolve brush once 
-            SolidColorBrush brush = BitmapHelper.SavedDominantColors.Count > 0
+            SolidColorBrush? brush = BitmapHelper.SavedDominantColors.Count > 0
                 ? BitmapHelper.SavedDominantColors.Last()
-                : (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorTertiary");
+                : null;
+
+            if (brush == null)
+            {
+                var res = Application.Current?.TryFindResource("MicaWPF.Brushes.SystemAccentColorTertiary");
+                brush = res as SolidColorBrush ?? Brushes.DeepSkyBlue;
+            }
 
             byte b = brush.Color.B;
             byte g = brush.Color.G;

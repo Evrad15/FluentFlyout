@@ -211,7 +211,7 @@ public partial class TaskbarWidgetControl : UserControl
         return (logicalWidth, logicalHeight);
     }
 
-    public void UpdateUi(string title, string artist, BitmapImage? icon, GlobalSystemMediaTransportControlsSessionPlaybackStatus? playbackStatus, GlobalSystemMediaTransportControlsSessionPlaybackControls? playbackControls = null)
+    public void UpdateUi(string title, string artist, ImageSource? icon, GlobalSystemMediaTransportControlsSessionPlaybackStatus? playbackStatus, GlobalSystemMediaTransportControlsSessionPlaybackControls? playbackControls = null)
     {
         if (title == "-" && artist == "-")
         {
@@ -341,7 +341,7 @@ public partial class TaskbarWidgetControl : UserControl
         });
     }
 
-    public void UpdateThumbnail(BitmapImage? icon)
+    public void UpdateThumbnail(ImageSource? icon)
     {
         Dispatcher.Invoke(() =>
         {

@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using Windows.Media.Control;
 using static WindowsMediaController.MediaManager;
 
@@ -137,7 +138,13 @@ public partial class MainWindow
             string formattedArtist = FormatArtists(songInfo);
             SongArtist.Text = formattedArtist;
             var image = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
-            SongImage.ImageSource = image;
+            ImageSource? displayImage = image;
+            if (displayImage == null && mediaSession != null)
+            {
+                (_, ImageSource? appIcon) = MediaPlayerData.GetAndCacheMediaPlayerData(mediaSession.Id);
+                displayImage = appIcon;
+            }
+            SongImage.ImageSource = displayImage;
 
             // Apply dominant-color gradient with animated crossfade (fork feature)
             var dominantColors = BitmapHelper.GetDominantColors(2, 15, true);
@@ -170,7 +177,8 @@ public partial class MainWindow
             // background blurred image
             if (SettingsManager.Current.MediaFlyoutBackgroundBlur != 0)
             {
-                var croppedImage = BitmapHelper.CropToSquare(image);
+                var sourceForBlur = image ?? (displayImage as BitmapSource);
+                var croppedImage = BitmapHelper.CropToSquare(sourceForBlur);
                 switch (SettingsManager.Current.MediaFlyoutBackgroundBlur)
                 {
                     case 1: BackgroundImageStyle1.Source = croppedImage; break;

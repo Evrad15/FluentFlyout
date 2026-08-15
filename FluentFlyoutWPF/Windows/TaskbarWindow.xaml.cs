@@ -11,6 +11,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Windows.Media.Control;
@@ -547,11 +548,9 @@ on_error:
                 break;
 
             case 2: // near end (right for horizontal, bottom for vertical)
+                int endOffset = primarySize - 20;
                 try
                 {
-                    if (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 1)
-                        primaryPos -= visualizerPhysicalWidth + 4;
-
                     // Horizontal only: try to position next to native Widgets button on the end side
                     if (!isVertical && SettingsManager.Current.TaskbarWidgetPadding)
                     {
@@ -563,9 +562,8 @@ on_error:
                             // make sure it's on the right side, otherwise ignore (widget might be to the left)
                             if (found && nativeWidgetRect.Left > (taskbarRect.Left + taskbarRect.Right) / 2.0)
                             {
-                                // Convert absolute screen position to relative position within taskbar
-                                primaryPos += (int)(nativeWidgetRect.Left - taskbarRect.Left) - 1 - physicalWidth;
-                                break;
+                                endOffset = (int)(nativeWidgetRect.Left - taskbarRect.Left) - 1;
+                                goto positionCalculated;
                             }
                         }
                         catch (Exception ex) // catch exception when getting widget position
@@ -586,8 +584,8 @@ on_error:
                             double trayOffset = isVertical
                                 ? trayRect.Top - taskbarRect.Top
                                 : trayRect.Left - taskbarRect.Left;
-                            primaryPos += (int)trayOffset - physicalWidth - (isVertical ? 2 : 1);
-                            break;
+                            endOffset = (int)trayOffset - (isVertical ? 2 : 1);
+                            goto positionCalculated;
                         }
                     }
                     else
@@ -598,8 +596,8 @@ on_error:
                             (bool trayFound, Rect trayAutomationRect) = GetSystemTrayRect(taskbarHandle);
                             if (trayFound && trayAutomationRect.Top >= taskbarRect.Top)
                             {
-                                primaryPos += (int)(trayAutomationRect.Top - taskbarRect.Top) - physicalWidth - 2;
-                                break;
+                                endOffset = (int)(trayAutomationRect.Top - taskbarRect.Top) - 2;
+                                goto positionCalculated;
                             }
                         }
 
@@ -618,28 +616,34 @@ on_error:
                             // For vertical: validate the tray is in the lower half of the taskbar
                             if (!isVertical || trayOffset > taskbarHeight / 2)
                             {
-                                primaryPos += (int)trayOffset - physicalWidth - (isVertical ? 2 : 1);
-                                break;
+                                endOffset = (int)trayOffset - (isVertical ? 2 : 1);
+                                goto positionCalculated;
                             }
                         }
                         else if (!isVertical)
                         {
                             // TrayNotifyWnd not found on horizontal: fallback to right alignment,
                             // since we are aligning to the right side and know the size of the taskbar.
-                            primaryPos += taskbarWidth - physicalWidth - 20;
-                            break;
+                            endOffset = taskbarWidth - 20;
+                            goto positionCalculated;
                         }
                     }
 
                     // Final fallback: place near the end of the taskbar
-                    primaryPos += primarySize - physicalWidth - 20;
+                    endOffset = primarySize - 20;
                 }
                 catch (Exception ex)
                 {
-                    // Fallback to left alignment
+                    // Fallback to left alignment or end
                     Logger.Warn(ex, "Failed to get System Tray position.");
-                    primaryPos = isVertical ? primarySize - physicalWidth - 20 : 20;
+                    endOffset = primarySize - 20;
                 }
+
+            positionCalculated:
+                int extraVisualizerOffset = (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 1)
+                    ? visualizerPhysicalWidth + 4
+                    : 0;
+                primaryPos = endOffset - physicalWidth - extraVisualizerOffset;
                 break;
         }
 
@@ -735,7 +739,7 @@ on_error:
         return new Rect(Canvas.GetLeft(TaskbarVisualizer) * dpiScale, Canvas.GetTop(TaskbarVisualizer) * dpiScale, rectW, rectH);
     }
 
-    public void UpdateUi(string title, string artist, BitmapImage? icon, GlobalSystemMediaTransportControlsSessionPlaybackStatus? playbackStatus, GlobalSystemMediaTransportControlsSessionPlaybackControls? playbackControls = null)
+    public void UpdateUi(string title, string artist, ImageSource? icon, GlobalSystemMediaTransportControlsSessionPlaybackStatus? playbackStatus, GlobalSystemMediaTransportControlsSessionPlaybackControls? playbackControls = null)
     {
         // Check premium status - hide widget if not unlocked
         if ((!SettingsManager.Current.TaskbarWidgetEnabled || !SettingsManager.Current.IsPremiumUnlocked))
@@ -809,7 +813,7 @@ on_error:
         });
     }
 
-    public void UpdateThumbnail(BitmapImage? icon)
+    public void UpdateThumbnail(ImageSource? icon)
     {
         if (!SettingsManager.Current.TaskbarWidgetEnabled || !SettingsManager.Current.IsPremiumUnlocked)
             return;

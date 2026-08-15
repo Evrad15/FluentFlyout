@@ -187,7 +187,7 @@ internal static class BitmapHelper
         }
     }
 
-    internal static CroppedBitmap? CropToSquare(BitmapImage? sourceImage)
+    internal static CroppedBitmap? CropToSquare(BitmapSource? sourceImage)
     {
         if (sourceImage == null)
             return null;

@@ -7,6 +7,7 @@ using FluentFlyout.Classes.Utils;
 using FluentFlyoutWPF.Classes;
 using MicaWPF.Controls;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace FluentFlyoutWPF.Windows;
@@ -17,7 +18,7 @@ namespace FluentFlyoutWPF.Windows;
 public partial class NextUpWindow : MicaWindow
 {
     MainWindow mainWindow = (MainWindow)Application.Current.MainWindow;
-    public NextUpWindow(string title, string artist, BitmapImage thumbnail)
+    public NextUpWindow(string title, string artist, ImageSource? thumbnail)
     {
         DataContext = SettingsManager.Current;
         WindowStartupLocation = WindowStartupLocation.Manual;
@@ -62,7 +63,7 @@ public partial class NextUpWindow : MicaWindow
         wait();
     }
 
-    public void UpdateThumbnail(BitmapImage thumbnail)
+    public void UpdateThumbnail(ImageSource? thumbnail)
     {
         SongImage.ImageSource = thumbnail;
         if (SongImage.ImageSource == null) SongImagePlaceholder.Visibility = Visibility.Visible;

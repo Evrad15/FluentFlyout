@@ -9,6 +9,8 @@ using FluentFlyoutWPF.Classes.Utils;
 using FluentFlyoutWPF.Windows;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Windows.Media.Control;
 using static WindowsMediaController.MediaManager;
 
@@ -62,9 +64,15 @@ public partial class MainWindow
         previousMediaPropertyThumbnail = checkThumbnail;
 
         var thumbnail = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
+        ImageSource? displayImage = thumbnail;
+        if (displayImage == null && mediaSession != null)
+        {
+            (_, ImageSource? appIcon) = MediaPlayerData.GetAndCacheMediaPlayerData(mediaSession.Id);
+            displayImage = appIcon;
+        }
         BitmapHelper.GetDominantColors(1);
 
-        taskbarWindow?.UpdateUi(title, artist, thumbnail, playbackInfo.PlaybackStatus, playbackInfo.Controls);
+        taskbarWindow?.UpdateUi(title, artist, displayImage, playbackInfo.PlaybackStatus, playbackInfo.Controls);
 
         PauseOtherMediaSessionsIfNeeded(mediaSession);
 
@@ -76,14 +84,14 @@ public partial class MainWindow
                 {
                     if (nextUpWindow == null && playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing)
                     {
-                        nextUpWindow = new NextUpWindow(title, artist, thumbnail);
+                        nextUpWindow = new NextUpWindow(title, artist, displayImage);
                         currentTitle = title;
                         nextUpWindow.Closed += (s, e) => nextUpWindow = null;
                     }
                 });
             }
 
-            if (nextUpWindow == null && !IsVisible && songInfo.Thumbnail != null && currentTitle != title)
+            if (nextUpWindow == null && !IsVisible && currentTitle != title)
             {
                 createNewNextUpWindow();
             }
@@ -99,9 +107,9 @@ public partial class MainWindow
                 });
                 createNewNextUpWindow();
             }
-            else if (nextUpWindow != null && songInfo.Thumbnail != null)
+            else if (nextUpWindow != null)
             {
-                Dispatcher.Invoke(() => nextUpWindow?.UpdateThumbnail(thumbnail));
+                Dispatcher.Invoke(() => nextUpWindow?.UpdateThumbnail(displayImage));
             }
         }
 
@@ -136,9 +144,15 @@ public partial class MainWindow
             string title = tbSongInfo.Title;
             string artist = FormatArtists(tbSongInfo);
             var tbThumbnail = BitmapHelper.GetThumbnail(tbSongInfo.Thumbnail);
+            ImageSource? tbDisplayImage = tbThumbnail;
+            if (tbDisplayImage == null && focusedSession != null)
+            {
+                (_, ImageSource? appIcon) = MediaPlayerData.GetAndCacheMediaPlayerData(focusedSession.Id);
+                tbDisplayImage = appIcon;
+            }
             BitmapHelper.GetDominantColors(1);
             var tbPlayback = focusedSession.ControlSession.GetPlaybackInfo();
-            taskbarWindow?.UpdateUi(title, artist, tbThumbnail, tbPlayback?.PlaybackStatus, tbPlayback?.Controls);
+            taskbarWindow?.UpdateUi(title, artist, tbDisplayImage, tbPlayback?.PlaybackStatus, tbPlayback?.Controls);
         }
 
         if (IsVisible)

@@ -415,8 +415,14 @@ public partial class MainWindow : MicaWindow
 
         var playbackInfo = activeSession.ControlSession.GetPlaybackInfo();
         var thumbnail = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
+        ImageSource? displayImage = thumbnail;
+        if (displayImage == null && activeSession != null)
+        {
+            (_, ImageSource? appIcon) = MediaPlayerData.GetAndCacheMediaPlayerData(activeSession.Id);
+            displayImage = appIcon;
+        }
         BitmapHelper.GetDominantColors(1);
-        taskbarWindow?.UpdateUi(songInfo.Title, FormatArtists(songInfo), thumbnail, playbackInfo.PlaybackStatus, playbackInfo.Controls);
+        taskbarWindow?.UpdateUi(songInfo.Title, FormatArtists(songInfo), displayImage, playbackInfo.PlaybackStatus, playbackInfo.Controls);
     }
 
     private void PauseOtherMediaSessionsIfNeeded(MediaSession mediaSession)
