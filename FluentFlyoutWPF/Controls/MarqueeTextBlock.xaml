@@ -1,0 +1,27 @@
+<UserControl x:Class="FluentFlyout.Controls.MarqueeTextBlock"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="20" d:DesignWidth="130"
+             ClipToBounds="True"
+             Loaded="UserControl_Loaded"
+             Unloaded="UserControl_Unloaded"
+             SizeChanged="UserControl_SizeChanged">
+    <Canvas ClipToBounds="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <TextBlock x:Name="DisplayTextBlock"
+                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontFamily="{Binding FontFamily, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   Opacity="{Binding TextOpacity, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Left"
+                   TextTrimming="None">
+            <TextBlock.RenderTransform>
+                <TranslateTransform x:Name="TextTransform" X="0" Y="0" />
+            </TextBlock.RenderTransform>
+        </TextBlock>
+    </Canvas>
+</UserControl>

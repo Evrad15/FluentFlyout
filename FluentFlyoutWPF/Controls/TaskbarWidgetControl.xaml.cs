@@ -24,15 +24,6 @@ public partial class TaskbarWidgetControl : UserControl
 {
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private readonly double _scale = 0.9;
-    private readonly int _nativeWidgetsPadding = 216;
-
-    // Cached width calculations
-    private string _cachedTitleText = string.Empty;
-    private string _cachedArtistText = string.Empty;
-    private double _cachedTitleWidth = 0;
-    private double _cachedArtistWidth = 0;
-
     // reference to main window for flyout functions
     private MainWindow? _mainWindow;
     private bool _isPaused;
@@ -202,44 +193,18 @@ public partial class TaskbarWidgetControl : UserControl
 
     public (double logicalWidth, double logicalHeight) CalculateSize(double dpiScale)
     {
-        // calculate widget width - use cached values if text hasn't changed
-        string currentTitle = SongTitle.Text;
-        string currentArtist = SongArtist.Text;
+        // Fixed standard width layout to ensure stable footprint and smooth marquee scrolling
+        double textWidth = 130;
+        double logicalWidth = 192;
 
-        if (!string.Equals(currentTitle, _cachedTitleText, StringComparison.Ordinal))
+        if (SettingsManager.Current.TaskbarWidgetControlsEnabled)
         {
-            _cachedTitleWidth = StringWidth.GetStringWidth(currentTitle, 400);
-            _cachedTitleText = currentTitle;
-        }
-        if (!string.Equals(currentArtist, _cachedArtistText, StringComparison.Ordinal))
-        {
-            _cachedArtistWidth = StringWidth.GetStringWidth(currentArtist, 400);
-            _cachedArtistText = currentArtist;
+            logicalWidth = 294;
         }
 
-        // maximum width limit, same as Windows native widget
-        double maxLogicalWidth = _nativeWidgetsPadding / _scale;
-        double logicalWidth;
-        if (SettingsManager.Current.TaskbarWidgetFixedWidth)
-        {
-            // pin to maximum width so right-aligned controls don't shift between songs
-            logicalWidth = maxLogicalWidth;
-        }
-        else
-        {
-            logicalWidth = Math.Max(_cachedTitleWidth, _cachedArtistWidth) + 55; // add margin for cover image
-            logicalWidth = Math.Min(logicalWidth, maxLogicalWidth);
-        }
-
-        SongTitle.Width = Math.Max(logicalWidth - 58, 0);
-        SongArtist.Width = Math.Max(logicalWidth - 58, 0);
-
-        // add space for playback controls if enabled and visible
-        if (SettingsManager.Current.TaskbarWidgetControlsEnabled && ControlsStackPanel.Visibility == Visibility.Visible)
-        {
-            logicalWidth += (int)(102);
-        }
-
+        if (SongTitle.Width != textWidth) SongTitle.Width = textWidth;
+        if (SongArtist.Width != textWidth) SongArtist.Width = textWidth;
+        if (SongInfoStackPanel.Width != textWidth) SongInfoStackPanel.Width = textWidth;
 
         double logicalHeight = 40; // default height
 
@@ -285,7 +250,7 @@ public partial class TaskbarWidgetControl : UserControl
             _isPaused = true;
         }
 
-        // adjust UI based on available controls
+        // adjust UI based on available controls and song metadata
         Dispatcher.Invoke(() =>
         {
             if (SettingsManager.Current.TaskbarWidgetControlsEnabled && playbackControls != null)
@@ -308,11 +273,8 @@ public partial class TaskbarWidgetControl : UserControl
                 NextButton.Opacity = 0.5;
                 PlayPauseButton.Opacity = 0.5;
             }
-        });
 
-        Dispatcher.Invoke(() =>
-        {
-            if (SongTitle.Text != title && SongArtist.Text != artist)
+            if (SongTitle.Text != title || SongArtist.Text != artist)
             {
                 // changed info
                 if (SettingsManager.Current.TaskbarWidgetAnimated)
@@ -379,26 +341,65 @@ public partial class TaskbarWidgetControl : UserControl
         });
     }
 
-    private async void AnimateEntrance()
+    public void UpdateThumbnail(BitmapImage? icon)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (icon != null)
+            {
+                if (_isPaused && SettingsManager.Current.TaskbarWidgetShowPauseOverlay && !SettingsManager.Current.TaskbarWidgetControlsEnabled)
+                {
+                    SongImagePlaceholder.Symbol = SymbolRegular.Pause24;
+                    SongImagePlaceholder.Visibility = Visibility.Visible;
+                    SongImage.Opacity = 0.4;
+                }
+                else
+                {
+                    SongImagePlaceholder.Visibility = Visibility.Collapsed;
+                    SongImage.Opacity = 1;
+                }
+                SongImage.ImageSource = icon;
+                BackgroundImage.Source = icon;
+                SongImageBorder.Margin = new Thickness(0, 0, 0, -2);
+            }
+            else
+            {
+                SongImagePlaceholder.Symbol = SymbolRegular.MusicNote220;
+                SongImagePlaceholder.Visibility = Visibility.Visible;
+                SongImage.ImageSource = null;
+                BackgroundImage.Source = null;
+            }
+
+            SolidColorBrush brush = BitmapHelper.SavedDominantColors.Count > 0 ?
+                BitmapHelper.SavedDominantColors.Last()
+                : (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorTertiary");
+            SongImagePlaceholder.Foreground = brush;
+        });
+    }
+
+    private void AnimateEntrance()
     {
         try
         {
             int msDuration = MainWindow.getDuration();
+            if (msDuration <= 0) return;
 
-            // opacity and left to right animation for SongInfoStackPanel
+            int animMs = Math.Min(msDuration, 200);
+
+            // opacity and subtle left to right animation for SongInfoStackPanel (starts at 0.4 so text is immediately visible)
             DoubleAnimation opacityAnimation = new()
             {
-                From = 0.0,
+                From = 0.4,
                 To = 1.0,
-                Duration = TimeSpan.FromMilliseconds(msDuration),
+                Duration = TimeSpan.FromMilliseconds(animMs),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };
 
             DoubleAnimation translateAnimation = new()
             {
-                From = -10,
+                From = -6,
                 To = 0,
-                Duration = TimeSpan.FromMilliseconds(msDuration),
+                Duration = TimeSpan.FromMilliseconds(animMs),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };
 

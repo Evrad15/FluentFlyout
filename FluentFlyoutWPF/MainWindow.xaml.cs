@@ -60,7 +60,7 @@ public partial class MainWindow : MicaWindow
     private bool _acrylicEnabled = false; // default off to handle initialization
     private int _themeOption = SettingsManager.Current.AppTheme;
 
-    static Mutex singleton = new Mutex(true, "FluentFlyout"); // to prevent multiple instances of the app
+    private static Mutex? singleton; // to prevent multiple instances of the app
     private NextUpWindow? nextUpWindow = null; // to prevent multiple instances of NextUpWindow
     private string currentTitle = ""; // to prevent NextUpWindow from showing the same song
 
@@ -86,7 +86,23 @@ public partial class MainWindow : MicaWindow
         InitializeComponent();
         WindowHelper.SetTopmost(this); // more prevention of fullscreen apps minimizing
 
-        if (!singleton.WaitOne(TimeSpan.Zero, true)) // if another instance is already running, close this one
+        bool isOnlyInstance = false;
+        try
+        {
+            singleton = new Mutex(false, "FluentFlyout_SingleInstance");
+            isOnlyInstance = singleton.WaitOne(0, false);
+        }
+        catch (AbandonedMutexException)
+        {
+            isOnlyInstance = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn(ex, "Mutex initialization exception");
+            isOnlyInstance = true;
+        }
+
+        if (!isOnlyInstance) // if another instance is already running, close this one
         {
             // Signal the existing instance to open settings
             Task.Run(() =>
@@ -339,6 +355,51 @@ public partial class MainWindow : MicaWindow
             Logger.Error(ex, "Failed to retrieve data from the player");
             return null;
         }
+    }
+
+    public static string FormatArtists(GlobalSystemMediaTransportControlsSessionMediaProperties? mediaProperties)
+    {
+        if (mediaProperties == null) return string.Empty;
+
+        string artist = mediaProperties.Artist?.Trim() ?? string.Empty;
+        string albumArtist = mediaProperties.AlbumArtist?.Trim() ?? string.Empty;
+        string subtitle = mediaProperties.Subtitle?.Trim() ?? string.Empty;
+
+        string result = artist;
+
+        if (string.IsNullOrEmpty(result))
+        {
+            result = !string.IsNullOrEmpty(albumArtist) ? albumArtist : subtitle;
+        }
+        else
+        {
+            char[] delimiters = [';', ',', '/', '&', '|', '+'];
+            bool albumArtistHasDelimiters = albumArtist.IndexOfAny(delimiters) >= 0;
+            bool artistHasDelimiters = artist.IndexOfAny(delimiters) >= 0;
+
+            if (!string.IsNullOrEmpty(albumArtist) && albumArtist != artist)
+            {
+                if (albumArtistHasDelimiters && !artistHasDelimiters && albumArtist.Contains(artist, StringComparison.OrdinalIgnoreCase))
+                {
+                    result = albumArtist;
+                }
+                else if (albumArtist.Length > artist.Length && albumArtist.Contains(artist, StringComparison.OrdinalIgnoreCase))
+                {
+                    result = albumArtist;
+                }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(result))
+        {
+            var parts = result.Split([';', '/', '\\', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length > 1)
+            {
+                result = string.Join(", ", parts.Distinct(StringComparer.OrdinalIgnoreCase));
+            }
+        }
+
+        return result;
     }
 
     private void openSettings(object? sender, EventArgs e)
@@ -595,7 +656,7 @@ public partial class MainWindow : MicaWindow
         var playbackInfo = activeSession.ControlSession.GetPlaybackInfo();
         var thumbnail = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
         BitmapHelper.GetDominantColors(1);
-        taskbarWindow?.UpdateUi(songInfo.Title, songInfo.Artist, thumbnail, playbackInfo.PlaybackStatus, playbackInfo.Controls);
+        taskbarWindow?.UpdateUi(songInfo.Title, FormatArtists(songInfo), thumbnail, playbackInfo.PlaybackStatus, playbackInfo.Controls);
     }
 
     public void reportBug(object? sender, EventArgs e)
@@ -660,7 +721,7 @@ public partial class MainWindow : MicaWindow
             BitmapHelper.GetDominantColors(1);
             var tbPlayback = focusedSession.ControlSession.GetPlaybackInfo();
 
-            taskbarWindow?.UpdateUi(tbSongInfo.Title, tbSongInfo.Artist, tbThumbnail, tbPlayback?.PlaybackStatus, tbPlayback?.Controls);
+            taskbarWindow?.UpdateUi(tbSongInfo.Title, FormatArtists(tbSongInfo), tbThumbnail, tbPlayback?.PlaybackStatus, tbPlayback?.Controls);
         }
 
         if (IsVisible)
@@ -689,13 +750,19 @@ public partial class MainWindow : MicaWindow
             return;
         }
 
-        var songInfo = TryGetMediaProperties(currentActiveSession.ControlSession);
+        // Use the passed mediaProperties directly if the active session is the one that changed to avoid redundant blocking COM calls
+        var songInfo = (currentActiveSession.Id == mediaSession.Id)
+            ? mediaProperties
+            : TryGetMediaProperties(currentActiveSession.ControlSession);
+
         if (songInfo == null)
             return;
 
         var playbackInfo = currentActiveSession.ControlSession.GetPlaybackInfo();
+        string title = songInfo.Title;
+        string artist = FormatArtists(songInfo);
 
-        string check = songInfo.Title + songInfo.Artist + playbackInfo.PlaybackStatus;
+        string check = title + artist + playbackInfo.PlaybackStatus;
         int checkThumbnail = BitmapHelper.GetStableThumbnailHash(songInfo.Thumbnail);
         bool onlyThumbnailChanged = false;
         if (previousMediaProperty == check)
@@ -711,7 +778,7 @@ public partial class MainWindow : MicaWindow
         var thumbnail = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
         BitmapHelper.GetDominantColors(1);
 
-        taskbarWindow?.UpdateUi(songInfo.Title, songInfo.Artist, thumbnail, playbackInfo.PlaybackStatus, playbackInfo.Controls);
+        taskbarWindow?.UpdateUi(title, artist, thumbnail, playbackInfo.PlaybackStatus, playbackInfo.Controls);
 
         pauseOtherMediaSessionsIfNeeded(mediaSession);
 
@@ -723,14 +790,14 @@ public partial class MainWindow : MicaWindow
                 {
                     if (nextUpWindow == null && playbackInfo.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing) // double-check within the Dispatcher to prevent race conditions
                     {
-                        nextUpWindow = new NextUpWindow(songInfo.Title, songInfo.Artist, thumbnail);
-                        currentTitle = songInfo.Title;
+                        nextUpWindow = new NextUpWindow(title, artist, thumbnail);
+                        currentTitle = title;
                         nextUpWindow.Closed += (s, e) => nextUpWindow = null; // set nextUpWindow to null when closed
                     }
                 });
             }
 
-            if (nextUpWindow == null && IsVisible == false && songInfo.Thumbnail != null && currentTitle != songInfo.Title)
+            if (nextUpWindow == null && IsVisible == false && songInfo.Thumbnail != null && currentTitle != title)
             {
                 createNewNextUpWindow();
             }
@@ -1121,7 +1188,8 @@ public partial class MainWindow : MicaWindow
             if (songInfo != null)
             {
                 SongTitle.Text = songInfo.Title;
-                SongArtist.Text = songInfo.Artist;
+                string formattedArtist = FormatArtists(songInfo);
+                SongArtist.Text = formattedArtist;
                 var image = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
                 SongImage.ImageSource = image;
 
@@ -1150,7 +1218,7 @@ public partial class MainWindow : MicaWindow
                 // set tooltip
                 SongInfoStackPanel.ToolTip = string.Empty;
                 SongInfoStackPanel.ToolTip += !String.IsNullOrEmpty(songInfo.Title) ? songInfo.Title : string.Empty;
-                SongInfoStackPanel.ToolTip += !String.IsNullOrEmpty(songInfo.Artist) ? "\n\n" + songInfo.Artist : string.Empty;
+                SongInfoStackPanel.ToolTip += !String.IsNullOrEmpty(formattedArtist) ? "\n\n" + formattedArtist : string.Empty;
 
                 // background blurred image
                 if (SettingsManager.Current.MediaFlyoutBackgroundBlur != 0)

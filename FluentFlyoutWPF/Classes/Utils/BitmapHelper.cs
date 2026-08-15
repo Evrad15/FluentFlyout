@@ -105,17 +105,34 @@ internal static class BitmapHelper
         get => _currentDominantColors ??= [];
     }
 
-    public static int GetStableThumbnailHash(IRandomAccessStreamReference thumbnail)
+    public static int ComputeFastHash(byte[] bytes)
+    {
+        unchecked
+        {
+            int hash = (int)2166136261;
+            hash = (hash ^ bytes.Length) * 16777619;
+            int step = Math.Max(1, bytes.Length / 64);
+            for (int i = 0; i < bytes.Length; i += step)
+            {
+                hash = (hash ^ bytes[i]) * 16777619;
+            }
+            return hash;
+        }
+    }
+
+    public static int GetStableThumbnailHash(IRandomAccessStreamReference? thumbnail)
     {
         if (thumbnail == null)
             return 0;
 
         try
         {
-            using Stream stream = thumbnail.OpenReadAsync().GetAwaiter().GetResult().AsStreamForRead();
-            using SHA256 sha256 = SHA256.Create();
-            byte[] hashBytes = sha256.ComputeHash(stream);
-            return BitConverter.ToInt32(hashBytes, 0);
+            using var raStream = thumbnail.OpenReadAsync().GetAwaiter().GetResult();
+            using var stream = raStream.AsStreamForRead();
+            using var ms = new MemoryStream();
+            stream.CopyTo(ms);
+            byte[] bytes = ms.ToArray();
+            return bytes.Length > 0 ? ComputeFastHash(bytes) : 0;
         }
         catch (Exception ex)
         {
@@ -129,36 +146,45 @@ internal static class BitmapHelper
         if (thumbnail == null)
             return null;
 
-        int hashCode = GetStableThumbnailHash(thumbnail);
-
-        if (hashCode == 0)
-            return null;
-
-        if (_thumbnailCache.TryGetValue(hashCode, out var cachedImage) && cachedImage != null)
+        try
         {
-            _currentHashCode = hashCode;
-            _currentHashCodeContext.Value = hashCode;
-            return cachedImage;
-        }
+            using var raStream = thumbnail.OpenReadAsync().GetAwaiter().GetResult();
+            using var stream = raStream.AsStreamForRead();
+            using var ms = new MemoryStream();
+            stream.CopyTo(ms);
+            byte[] bytes = ms.ToArray();
 
-        BitmapImage image = new();
-        using (var imageStream = thumbnail.OpenReadAsync().GetAwaiter().GetResult().AsStreamForRead())
-        {
-            // initialize the BitmapImage
+            if (bytes.Length == 0)
+                return null;
+
+            int hashCode = ComputeFastHash(bytes);
+
+            if (_thumbnailCache.TryGetValue(hashCode, out var cachedImage) && cachedImage != null)
+            {
+                _currentHashCode = hashCode;
+                _currentHashCodeContext.Value = hashCode;
+                return cachedImage;
+            }
+
+            ms.Position = 0;
+            BitmapImage image = new();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.DecodePixelWidth = maxThumbnailSize;
-            image.StreamSource = imageStream;
+            image.StreamSource = ms;
             image.EndInit();
+            image.Freeze();
+
+            _thumbnailCache.Set(hashCode, image);
+            _currentHashCode = hashCode;
+            _currentHashCodeContext.Value = hashCode;
+            return image;
         }
-        image.Freeze();
-
-        // add bitmap to thumbnail cache with empty brush
-        _thumbnailCache.Set(hashCode, image);
-
-        _currentHashCode = hashCode;
-        _currentHashCodeContext.Value = hashCode;
-        return image;
+        catch (Exception ex)
+        {
+            Logger.Warn(ex, "Failed to load thumbnail");
+            return null;
+        }
     }
 
     internal static CroppedBitmap? CropToSquare(BitmapImage? sourceImage)

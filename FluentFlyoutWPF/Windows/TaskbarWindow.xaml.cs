@@ -26,13 +26,14 @@ public partial class TaskbarWindow : Window
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
     private readonly DispatcherTimer _timer;
-    private readonly int _nativeWidgetsPadding = 216;
     private readonly double _scale = 0.9;
 
     private IntPtr _trayHandle;
     private AutomationElement? _widgetElement;
     private AutomationElement? _trayElement;
     private AutomationElement? _taskbarFrameElement;
+    private AutomationElement? _startElement;
+    private AutomationElement? _searchElement;
     // reference to main window for flyout functions
     private MainWindow? _mainWindow;
     private int _lastSelectedMonitor = -1;
@@ -443,60 +444,113 @@ on_error:
 
         // Primary axis position (calculated per-case below)
         int primaryPos = 0;
+        int visualizerPhysicalWidth = SettingsManager.Current.TaskbarVisualizerEnabled
+            ? (int)(TaskbarVisualizer.Width * dpiScale)
+            : 0;
 
         switch (SettingsManager.Current.TaskbarWidgetPosition)
         {
             case 0: // near start (left for horizontal, top for vertical)
-                primaryPos = 20;
+                int startOffset = 20;
 
-                if (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 0)
-                    primaryPos += (int)(TaskbarVisualizer.Width * dpiScale) + 4;
-
-                if (!SettingsManager.Current.TaskbarWidgetPadding)
-                    break;
-
-                // automatic widget padding to the start
-                try
+                bool isLeftAligned = IsTaskbarLeftAligned();
+                if (isLeftAligned)
                 {
-                    // find widget button in XAML
-                    (bool found, Rect nativeWidgetRect) = GetTaskbarWidgetRect(taskbarHandle);
-
-                    // Accept only if the native Widgets button is in the start half of the taskbar
-                    bool inStartHalf = isVertical
-                        ? nativeWidgetRect.Bottom < (taskbarRect.Top + taskbarRect.Bottom) / 2.0
-                        : nativeWidgetRect.Right < (taskbarRect.Left + taskbarRect.Right) / 2.0;
-
-                    if (found && inStartHalf)
+                    // For left-aligned taskbars (Windows 10 style or Windows 11 left alignment),
+                    // the Start button is located at the far left edge (~48px).
+                    // We must position the group past the Start button and search button to avoid overlapping the Windows logo.
+                    int minOffset = 54;
+                    try
                     {
-                        // Convert absolute screen position to relative position within taskbar
-                        primaryPos = isVertical
-                            ? (int)(nativeWidgetRect.Bottom - taskbarRect.Top) + 2
-                            : (int)(nativeWidgetRect.Right - taskbarRect.Left) + 2;
+                        (bool startFound, Rect startRect) = GetStartButtonRect(taskbarHandle);
+                        if (startFound && !startRect.IsEmpty)
+                        {
+                            double startExtent = isVertical
+                                ? (startRect.Bottom - taskbarRect.Top)
+                                : (startRect.Right - taskbarRect.Left);
+                            if (startExtent > 0 && startExtent < primarySize / 2.0)
+                            {
+                                minOffset = Math.Max(minOffset, (int)startExtent + 6);
+                            }
+                        }
+
+                        (bool searchFound, Rect searchRect) = GetSearchButtonRect(taskbarHandle);
+                        if (searchFound && !searchRect.IsEmpty)
+                        {
+                            double searchExtent = isVertical
+                                ? (searchRect.Bottom - taskbarRect.Top)
+                                : (searchRect.Right - taskbarRect.Left);
+                            if (searchExtent > 0 && searchExtent < primarySize / 2.0)
+                            {
+                                minOffset = Math.Max(minOffset, (int)searchExtent + 6);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn(ex, "Failed to get Start/Search button position.");
+                    }
+
+                    startOffset = minOffset;
+                }
+                else if (SettingsManager.Current.TaskbarWidgetPadding)
+                {
+                    try
+                    {
+                        // find native widget button in XAML (e.g. Windows weather widget)
+                        (bool found, Rect nativeWidgetRect) = GetTaskbarWidgetRect(taskbarHandle);
+
+                        // Accept only if the native Widgets button is in the start half of the taskbar
+                        bool inStartHalf = isVertical
+                            ? nativeWidgetRect.Bottom < (taskbarRect.Top + taskbarRect.Bottom) / 2.0
+                            : nativeWidgetRect.Right < (taskbarRect.Left + taskbarRect.Right) / 2.0;
+
+                        if (found && inStartHalf)
+                        {
+                            // Convert absolute screen position to relative position within taskbar
+                            startOffset = isVertical
+                                ? (int)(nativeWidgetRect.Bottom - taskbarRect.Top) + 4
+                                : (int)(nativeWidgetRect.Right - taskbarRect.Left) + 4;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn(ex, "Failed to get Widgets button position.");
                     }
                 }
-                catch (Exception ex)
+
+                if (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 0)
                 {
-                    // fallback to default padding
-                    Logger.Warn(ex, "Failed to get Widgets button position.");
-                    primaryPos += _nativeWidgetsPadding + 2;
+                    primaryPos = startOffset + visualizerPhysicalWidth + 4;
+                }
+                else
+                {
+                    primaryPos = startOffset;
                 }
                 break;
 
             case 1: // center of the taskbar
-                primaryPos = (primarySize - physicalWidth) / 2;
-
                 if (SettingsManager.Current.TaskbarVisualizerEnabled)
+                {
+                    int combinedWidth = physicalWidth + visualizerPhysicalWidth + 4;
+                    int combinedStart = (primarySize - combinedWidth) / 2;
+
                     if (SettingsManager.Current.TaskbarVisualizerPosition == 0)
-                        primaryPos += (int)(TaskbarVisualizer.Width * dpiScale) / 2 + 4;
+                        primaryPos = combinedStart + visualizerPhysicalWidth + 4;
                     else
-                        primaryPos -= (int)(TaskbarVisualizer.Width * dpiScale) / 2 - 4;
+                        primaryPos = combinedStart;
+                }
+                else
+                {
+                    primaryPos = (primarySize - physicalWidth) / 2;
+                }
                 break;
 
             case 2: // near end (right for horizontal, bottom for vertical)
                 try
                 {
                     if (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 1)
-                        primaryPos -= (int)(TaskbarVisualizer.Width * dpiScale) - 4;
+                        primaryPos -= visualizerPhysicalWidth + 4;
 
                     // Horizontal only: try to position next to native Widgets button on the end side
                     if (!isVertical && SettingsManager.Current.TaskbarWidgetPadding)
@@ -632,12 +686,12 @@ on_error:
         switch (SettingsManager.Current.TaskbarVisualizerPosition)
         {
             case 0: // before widget (left for horizontal, above for vertical)
-                primaryPos = (int)(widgetPrimaryStart * dpiScale) - (int)(TaskbarVisualizer.Width * dpiScale);
+                primaryPos = (int)(widgetPrimaryStart * dpiScale) - (int)(TaskbarVisualizer.Width * dpiScale) - 4;
                 break;
 
             case 1: // after widget (right for horizontal, below for vertical)
                 // Widget.Width holds the logical width; after 90° rotation its visual height = Widget.Width * dpiScale
-                primaryPos = (int)(widgetPrimaryStart * dpiScale) + (int)(Widget.Width * dpiScale);
+                primaryPos = (int)(widgetPrimaryStart * dpiScale) + (int)(Widget.Width * dpiScale) + 4;
                 break;
 
             default:
@@ -728,6 +782,14 @@ on_error:
         {
             Visibility = Visibility.Visible;
         });
+    }
+
+    public void UpdateThumbnail(BitmapImage? icon)
+    {
+        if (!SettingsManager.Current.TaskbarWidgetEnabled || !SettingsManager.Current.IsPremiumUnlocked)
+            return;
+
+        Widget.UpdateThumbnail(icon);
     }
 
     private (bool, Rect) GetTaskbarXamlElementRect(IntPtr taskbarHandle, ref AutomationElement? elementCache, string elementName)
@@ -836,6 +898,36 @@ on_error:
     private (bool, Rect) GetTaskbarWidgetRect(IntPtr taskbarHandle)
     {
         return GetTaskbarXamlElementRect(taskbarHandle, ref _widgetElement, "WidgetsButton");
+    }
+
+    private (bool, Rect) GetStartButtonRect(IntPtr taskbarHandle)
+    {
+        return GetTaskbarXamlElementRect(taskbarHandle, ref _startElement, "StartButton");
+    }
+
+    private (bool, Rect) GetSearchButtonRect(IntPtr taskbarHandle)
+    {
+        var result = GetTaskbarXamlElementRect(taskbarHandle, ref _searchElement, "SearchBoxButton");
+        if (result.Item1 && result.Item2 != Rect.Empty)
+            return result;
+        return GetTaskbarXamlElementRect(taskbarHandle, ref _searchElement, "SearchTaskbarItem");
+    }
+
+    private bool IsTaskbarLeftAligned()
+    {
+        try
+        {
+            object? val = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+                "TaskbarAl",
+                1);
+            if (val is int intVal && intVal == 0)
+                return true;
+        }
+        catch
+        {
+        }
+        return false;
     }
 
     private (bool, Rect) GetSystemTrayRect(IntPtr taskbarHandle)

@@ -5,9 +5,9 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:viewModels="clr-namespace:FluentFlyoutWPF.ViewModels"
+             xmlns:local="clr-namespace:FluentFlyout.Controls"
              mc:Ignorable="d"
-             d:DataContext="{d:DesignInstance viewModels:UserSettings}"
-             Height="40" Width="100"
+             Height="40"
              TextOptions.TextRenderingMode="ClearType" TextOptions.TextFormattingMode="Ideal"
              FontFamily="{Binding FontFamily}"
              FlowDirection="{Binding FlowDirection}">
@@ -18,38 +18,31 @@
                     <BlurEffect Radius="80" />
                 </Image.Effect>
             </Image>
-            <!-- unused next image for crossfade effect
-            <Image x:Name="BackgroundImageNext" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5" Opacity="0">
-                <Image.Effect>
-                    <BlurEffect Radius="80" />
-                </Image.Effect>
-            </Image> -->
             
             <Border Name="TopBorder" BorderThickness="0,1.25,0,0" CornerRadius="5" Margin="0,0,0,1.25">
-                <Grid Name="MainGrid" HorizontalAlignment="Left" VerticalAlignment="Center" RenderTransformOrigin="0,0.5">
-                    <Grid.RenderTransform>
+                <Grid Name="MainGrid" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Grid.LayoutTransform>
                         <ScaleTransform ScaleX="0.9" ScaleY="0.9" />
-                    </Grid.RenderTransform>
-                    <StackPanel Name="MainStackPanel" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto" Margin="4,0,-100,0">
+                    </Grid.LayoutTransform>
+                    <StackPanel Name="MainStackPanel" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Width="Auto" Margin="4,0,4,0">
                         <Border Name="SongImageBorder" CornerRadius="5" Margin="0,0,0,-2" ClipToBounds="True" Width="36" Height="36" Panel.ZIndex="2">
                             <Grid>
                                 <ui:SymbolIcon Name="SongImagePlaceholder" Symbol="MusicNote220" FontSize="24" Filled="True" Foreground="{DynamicResource MicaWPF.Brushes.SystemAccentColorTertiary}" />
-                                <!--<Image x:Name="VisualizerContainer" Width="Auto" Height="Auto" Margin="4" />-->
                             </Grid>
                             <Border.Background>
                                 <ImageBrush x:Name="SongImage" Stretch="UniformToFill" />
                             </Border.Background>
                         </Border>
 
-                        <StackPanel Name="SongInfoStackPanel" Orientation="Vertical" VerticalAlignment="Center" Width="Auto" Margin="8,0,0,0" 
+                        <StackPanel Name="SongInfoStackPanel" Orientation="Vertical" VerticalAlignment="Center" Width="130" Margin="8,0,0,0" 
                                     ToolTipService.InitialShowDelay="800"
                                     ToolTipService.Placement="RelativePoint"
                                     ToolTipService.VerticalOffset="-16">
-                            <TextBlock Name="SongTitle" Text="" FontWeight="Normal" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Name="SongArtist" Text="" FontWeight="Normal" Opacity="0.5" Margin="0,-1.5,0,0" TextTrimming="CharacterEllipsis" />
+                            <local:MarqueeTextBlock x:Name="SongTitle" Text="" FontWeight="Normal" Height="18" Width="130" />
+                            <local:MarqueeTextBlock x:Name="SongArtist" Text="" FontWeight="Normal" TextOpacity="0.5" Height="16" Width="130" Margin="0,-1.5,0,0" />
                         </StackPanel>
 
-                        <StackPanel Name="ControlsStackPanel" Orientation="Horizontal" VerticalAlignment="Center" Width="Auto" Margin="8,0,0,0">
+                        <StackPanel Name="ControlsStackPanel" Orientation="Horizontal" VerticalAlignment="Center" Width="Auto" Margin="6,0,0,0">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
                                     <Setter Property="Visibility" Value="Collapsed" />
