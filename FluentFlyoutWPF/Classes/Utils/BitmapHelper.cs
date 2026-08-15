@@ -212,12 +212,15 @@ internal static class BitmapHelper
     /// <param name="colorCount">Amount of colors needed</param>
     /// <param name="maxIterations">Amount of k-means iterations (more = higher accuracy)</param>
     /// <returns>List of dominant colors from cached Bitmap as SolidColorBrush</returns>
-    public static List<SolidColorBrush> GetDominantColors(int colorCount, int maxIterations = 15, bool forceAlbumArt = false)
+    public static List<SolidColorBrush> GetDominantColors(int colorCount, int maxIterations = 15, bool forceAlbumArt = true)
     {
         int hashCode = _currentHashCodeContext.Value != 0 ? _currentHashCodeContext.Value : _currentHashCode;
 
-        if ((!SettingsManager.Current.UseAlbumArtAsAccentColor && !forceAlbumArt) || hashCode == 0)
+        if (hashCode == 0)
         {
+            if (_currentDominantColors != null && _currentDominantColors.Count > 0)
+                return _currentDominantColors;
+
             // control color (buttons, etc.)
             var accent = (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorSecondary");
             if (!accent.IsFrozen)
@@ -225,6 +228,25 @@ internal static class BitmapHelper
             accent.Freeze();
 
             // accent color (for non-control elements)
+            var accent2 = (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorTertiary");
+            if (!accent2.IsFrozen)
+                accent2 = accent2.Clone();
+            accent2.Freeze();
+
+            _currentDominantColors = [accent, accent2];
+            return _currentDominantColors;
+        }
+
+        if (!SettingsManager.Current.UseAlbumArtAsAccentColor && !forceAlbumArt)
+        {
+            if (_currentDominantColors != null && _currentDominantColors.Count > 0)
+                return _currentDominantColors;
+
+            var accent = (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorSecondary");
+            if (!accent.IsFrozen)
+                accent = accent.Clone();
+            accent.Freeze();
+
             var accent2 = (SolidColorBrush)Application.Current.TryFindResource("MicaWPF.Brushes.SystemAccentColorTertiary");
             if (!accent2.IsFrozen)
                 accent2 = accent2.Clone();

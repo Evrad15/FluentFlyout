@@ -918,6 +918,12 @@ public partial class UserSettings : ObservableObject
         TaskbarVisualizerHasContent = true;
     }
 
+    partial void OnTaskbarVisualizerHasContentChanged(bool oldValue, bool newValue)
+    {
+        if (oldValue == newValue || _initializing) return;
+        UpdateTaskbar();
+    }
+
     partial void OnUseAlbumArtAsAccentColorChanged(bool oldValue, bool newValue)
     {
         if (oldValue == newValue || _initializing) return;

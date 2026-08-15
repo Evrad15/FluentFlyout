@@ -679,24 +679,49 @@ on_error:
         // TaskbarVisualizer.Width (84) is the primary-axis extent for both orientations:
         //   horizontal: actual width = 84
         //   vertical:   visual height after rotation = 84
-        // Position adjacent to the widget along the primary axis
-        double widgetPrimaryStart = isVertical ? Canvas.GetTop(Widget) : Canvas.GetLeft(Widget);
         int primaryPos;
 
-        switch (SettingsManager.Current.TaskbarVisualizerPosition)
+        if (!SettingsManager.Current.TaskbarWidgetEnabled)
         {
-            case 0: // before widget (left for horizontal, above for vertical)
-                primaryPos = (int)(widgetPrimaryStart * dpiScale) - (int)(TaskbarVisualizer.Width * dpiScale) - 4;
-                break;
+            // Standalone visualizer positioning when widget is disabled
+            int visualizerPhysicalWidth = (int)(TaskbarVisualizer.Width * dpiScale);
+            int primarySize = isVertical ? taskbarHeight : taskbarWidth;
 
-            case 1: // after widget (right for horizontal, below for vertical)
-                // Widget.Width holds the logical width; after 90° rotation its visual height = Widget.Width * dpiScale
-                primaryPos = (int)(widgetPrimaryStart * dpiScale) + (int)(Widget.Width * dpiScale) + 4;
-                break;
+            switch (SettingsManager.Current.TaskbarWidgetPosition)
+            {
+                case 0: // near start
+                    primaryPos = 54;
+                    break;
+                case 1: // center
+                    primaryPos = (primarySize - visualizerPhysicalWidth) / 2;
+                    break;
+                case 2: // near end
+                default:
+                    primaryPos = primarySize - visualizerPhysicalWidth - 20;
+                    break;
+            }
+            primaryPos += SettingsManager.Current.TaskbarWidgetManualPadding;
+        }
+        else
+        {
+            // Position adjacent to the widget along the primary axis
+            double widgetPrimaryStart = isVertical ? Canvas.GetTop(Widget) : Canvas.GetLeft(Widget);
 
-            default:
-                primaryPos = 0;
-                break;
+            switch (SettingsManager.Current.TaskbarVisualizerPosition)
+            {
+                case 0: // before widget (left for horizontal, above for vertical)
+                    primaryPos = (int)(widgetPrimaryStart * dpiScale) - (int)(TaskbarVisualizer.Width * dpiScale) - 4;
+                    break;
+
+                case 1: // after widget (right for horizontal, below for vertical)
+                    // Widget.Width holds the logical width; after 90° rotation its visual height = Widget.Width * dpiScale
+                    primaryPos = (int)(widgetPrimaryStart * dpiScale) + (int)(Widget.Width * dpiScale) + 4;
+                    break;
+
+                default:
+                    primaryPos = 0;
+                    break;
+            }
         }
 
         // Set visualizer position within canvas
