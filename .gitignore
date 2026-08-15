@@ -369,3 +369,5 @@ FodyWeavers.xsd
 .vscode/
 
 Website/tailwindcss.exe
+installer_output/
+scratch/
