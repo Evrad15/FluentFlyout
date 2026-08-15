@@ -50,8 +50,16 @@ public partial class MainWindow
         string title = songInfo.Title;
         string artist = FormatArtists(songInfo);
 
+        var thumbnail = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
+        ImageSource? displayImage = thumbnail;
+        if (displayImage == null && mediaSession != null)
+        {
+            (_, ImageSource? appIcon) = MediaPlayerData.GetAndCacheMediaPlayerData(mediaSession.Id);
+            displayImage = appIcon;
+        }
+
         string check = title + artist + playbackInfo.PlaybackStatus;
-        int checkThumbnail = BitmapHelper.GetStableThumbnailHash(songInfo.Thumbnail);
+        int checkThumbnail = BitmapHelper.CurrentHashCode;
         bool onlyThumbnailChanged = false;
         if (previousMediaProperty == check)
         {
@@ -63,13 +71,6 @@ public partial class MainWindow
         previousMediaProperty = check;
         previousMediaPropertyThumbnail = checkThumbnail;
 
-        var thumbnail = BitmapHelper.GetThumbnail(songInfo.Thumbnail);
-        ImageSource? displayImage = thumbnail;
-        if (displayImage == null && mediaSession != null)
-        {
-            (_, ImageSource? appIcon) = MediaPlayerData.GetAndCacheMediaPlayerData(mediaSession.Id);
-            displayImage = appIcon;
-        }
         BitmapHelper.GetDominantColors(1);
 
         taskbarWindow?.UpdateUi(title, artist, displayImage, playbackInfo.PlaybackStatus, playbackInfo.Controls);

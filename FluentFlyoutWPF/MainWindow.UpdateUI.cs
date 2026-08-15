@@ -155,7 +155,7 @@ public partial class MainWindow
                 Color colorStart = dominantColors[0].Color;
                 Color colorEnd   = dominantColors.Count > 1
                     ? dominantColors[1].Color
-                    : Color.FromArgb(0, colorStart.R, colorStart.G, colorStart.B);
+                    : Color.FromArgb(colorStart.A, (byte)(colorStart.R * 0.65), (byte)(colorStart.G * 0.65), (byte)(colorStart.B * 0.65));
 
                 var newBrush = new LinearGradientBrush(colorStart, colorEnd, new Point(0, 0), new Point(1, 1))
                 {
