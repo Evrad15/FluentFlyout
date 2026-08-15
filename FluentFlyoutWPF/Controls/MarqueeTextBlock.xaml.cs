@@ -30,6 +30,8 @@ public partial class MarqueeTextBlock : UserControl
     private double _activeAvailableWidth = 0;
     private bool _isMarqueeActive = false;
 
+    public bool IsMarqueeActive => _isMarqueeActive;
+
     public string Text
     {
         get => (string)GetValue(TextProperty);

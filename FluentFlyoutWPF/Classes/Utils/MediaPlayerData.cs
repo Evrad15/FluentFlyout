@@ -69,8 +69,12 @@ public static class MediaPlayerData
             {
                 try
                 {
-                    // pre-filter processes without a main window handle
-                    if (p.MainWindowHandle == IntPtr.Zero)
+                    // Check if process name matches any variant
+                    string procName = p.ProcessName;
+                    bool nameMatches = variants.Any(v => procName.Contains(v, StringComparison.OrdinalIgnoreCase));
+
+                    // If neither name matches nor does it have a window, skip inaccessible background workers
+                    if (!nameMatches && p.MainWindowHandle == IntPtr.Zero)
                     {
                         return null;
                     }
@@ -80,13 +84,13 @@ public static class MediaPlayerData
 
                     string path = mainModule.FileName;
 
-                    if (variants.Any(v => path.Contains(v, StringComparison.OrdinalIgnoreCase)))
+                    if (nameMatches || variants.Any(v => path.Contains(v, StringComparison.OrdinalIgnoreCase)))
                     {
                         // prioritize the FileDescription for a user-friendly name
                         // fall back to MainWindowTitle if the description is empty
                         string title = !string.IsNullOrWhiteSpace(mainModule.FileVersionInfo.FileDescription)
                                         ? mainModule.FileVersionInfo.FileDescription
-                                        : p.MainWindowTitle;
+                                        : (!string.IsNullOrWhiteSpace(p.MainWindowTitle) ? p.MainWindowTitle : procName);
 
                         return new { Title = title, Path = path, ProcessId = p.Id };
                     }
@@ -94,6 +98,10 @@ public static class MediaPlayerData
                 catch (System.ComponentModel.Win32Exception)
                 {
                     // silently ignore the exception for inaccessible processes
+                }
+                catch (InvalidOperationException)
+                {
+                    // process may have exited during enumeration
                 }
                 return null;
             })

@@ -25,6 +25,7 @@ namespace FluentFlyoutWPF.Classes
         private WasapiLoopbackCapture? _capture;
         private MMDevice? _renderDevice;
         private static float[]? _barValues;
+        private static float[]? _currentBars;
         private WriteableBitmap? _bitmap;
         private bool _isRunning;
         private readonly object _lock = new();
@@ -32,6 +33,16 @@ namespace FluentFlyoutWPF.Classes
         private readonly int _fftLength = 4096;
         private int _fftPos = 0;
         private readonly Complex[] _fftBuffer;
+        private readonly float[] _hammingTable;
+
+        private struct BarFreqBin
+        {
+            public int StartBin;
+            public int EndBin;
+            public float LinearBoost;
+        }
+        private static BarFreqBin[]? _barBins;
+        private static int _lastSampleRate = 0;
 
         private readonly int _targetFps = 30;
         private DateTime _lastUpdateTime = DateTime.MinValue;
@@ -39,6 +50,7 @@ namespace FluentFlyoutWPF.Classes
         private System.Timers.Timer? _captureWatchdog;
         private DateTime _lastDataAvailableUtc = DateTime.MinValue;
         private int _restartInProgress; // 0=false, 1=true (Interlocked)
+        private int _isRenderingFrame;  // 0=idle, 1=rendering (Interlocked)
         private string? _deviceId; // track current device ID for restart logic
 
         private readonly struct BarGeometry
@@ -76,6 +88,11 @@ namespace FluentFlyoutWPF.Classes
             InitializeBitmap();
 
             _fftBuffer = new Complex[_fftLength];
+            _hammingTable = new float[_fftLength];
+            for (int i = 0; i < _fftLength; i++)
+            {
+                _hammingTable[i] = (float)FastFourierTransform.HammingWindow(i, _fftLength);
+            }
 
             ResizeBarList(SettingsManager.Current.TaskbarVisualizerBarCount);
             AudioDeviceMonitor.Instance.DefaultDeviceChanged += OnDefaultDeviceChanged;
@@ -195,6 +212,42 @@ namespace FluentFlyoutWPF.Classes
         {
             BarCount = newBarCount;
             _barValues = new float[BarCount];
+            _currentBars = new float[BarCount];
+            _barBins = null; // force recomputation of frequency bin mapping
+        }
+
+        private static void RecomputeBarBins(int sampleRate)
+        {
+            _lastSampleRate = sampleRate;
+            double frequencyPerBin = (double)sampleRate / 4096;
+            double minFreq = 40;   // Hz
+            double maxFreq = 8000; // Hz
+            int halfFft = 2048;
+
+            var bins = new BarFreqBin[BarCount];
+            for (int i = 0; i < BarCount; i++)
+            {
+                double startFreq = minFreq * Math.Pow(maxFreq / minFreq, (double)i / BarCount);
+                double endFreq = minFreq * Math.Pow(maxFreq / minFreq, (double)(i + 1) / BarCount);
+
+                int startBin = (int)(startFreq / frequencyPerBin);
+                int endBin = (int)(endFreq / frequencyPerBin);
+
+                if (endBin <= startBin) endBin = startBin + 1;
+                if (endBin >= halfFft) endBin = halfFft - 1;
+
+                float progress = (float)i / BarCount;
+                float linearBoost = 1.0f + (progress * 75.0f);
+
+                bins[i] = new BarFreqBin
+                {
+                    StartBin = startBin,
+                    EndBin = endBin,
+                    LinearBoost = linearBoost
+                };
+            }
+
+            _barBins = bins;
         }
 
         public void Start()
@@ -204,6 +257,7 @@ namespace FluentFlyoutWPF.Classes
 
             float barCount = BarCount >= 0 ? BarCount : 8;
             _barValues = new float[(int)barCount];
+            _currentBars = new float[(int)barCount];
 
             try
             {
@@ -284,15 +338,15 @@ namespace FluentFlyoutWPF.Classes
 
         private void OnDataAvailable(object? sender, WaveInEventArgs e)
         {
-            if (!_isRunning || e.BytesRecorded == 0)
+            if (!_isRunning || e.BytesRecorded == 0 || _capture == null)
                 return;
 
             _lastDataAvailableUtc = DateTime.UtcNow;
 
-            _captureWatchdog.Stop();
-            _captureWatchdog.Start();
+            _captureWatchdog?.Stop();
+            _captureWatchdog?.Start();
 
-            int bytesPerSample = _capture!.WaveFormat.BitsPerSample / 8;
+            int bytesPerSample = _capture.WaveFormat.BitsPerSample / 8;
             int samplesRecorded = e.BytesRecorded / bytesPerSample;
 
             for (int i = 0; i < samplesRecorded; i++)
@@ -307,7 +361,7 @@ namespace FluentFlyoutWPF.Classes
                     sampleValue = BitConverter.ToInt16(e.Buffer, i * 2) / 32768f;
                 }
 
-                _fftBuffer[_fftPos].X = (float)(sampleValue * FastFourierTransform.HammingWindow(_fftPos, _fftLength));
+                _fftBuffer[_fftPos].X = sampleValue * _hammingTable[_fftPos];
                 _fftBuffer[_fftPos].Y = 0;
                 _fftPos++;
 
@@ -339,12 +393,15 @@ namespace FluentFlyoutWPF.Classes
 
                 // check if bars are all zero, if so set has content to false to disable hover effect
                 bool allZero = true;
-                for (int j = 0; j < BarCount; j++)
+                if (_barValues != null)
                 {
-                    if (_barValues[j] > 0.01f)
+                    for (int j = 0; j < _barValues.Length; j++)
                     {
-                        allZero = false;
-                        break;
+                        if (_barValues[j] > 0.01f)
+                        {
+                            allZero = false;
+                            break;
+                        }
                     }
                 }
 
@@ -358,69 +415,64 @@ namespace FluentFlyoutWPF.Classes
 
         private void ProcessFftData()
         {
+            if (_capture == null) return;
+
             FastFourierTransform.FFT(true, (int)Math.Log(_fftLength, 2.0), _fftBuffer);
 
             int sampleRate = _capture.WaveFormat.SampleRate;
-            double frequencyPerBin = (double)sampleRate / _fftLength;
+            if (_barBins == null || _barBins.Length != BarCount || _lastSampleRate != sampleRate)
+            {
+                RecomputeBarBins(sampleRate);
+            }
 
-            double minFreq = 40;   // Hz
-            double maxFreq = 8000; // Hz
-            //double minFreq = 40;  // Hz // could be a setting to be bass only
-            //double maxFreq = 120; // Hz
+            var bins = _barBins!;
+            if (_currentBars == null || _currentBars.Length != BarCount)
+            {
+                _currentBars = new float[BarCount];
+            }
+            if (_barValues == null || _barValues.Length != BarCount)
+            {
+                _barValues = new float[BarCount];
+            }
+
             float minDb = (SettingsManager.Current.TaskbarVisualizerAudioSensitivity * -10f) - 30f;
             float maxDb = (SettingsManager.Current.TaskbarVisualizerAudioPeakLevel * 10f) - 30f;
-
-            float[] currentBars = new float[BarCount];
+            float invDbRange = 1.0f / Math.Max(0.001f, maxDb - minDb);
 
             for (int i = 0; i < BarCount; i++)
             {
-                double startFreq = minFreq * Math.Pow(maxFreq / minFreq, (double)i / BarCount);
-                double endFreq = minFreq * Math.Pow(maxFreq / minFreq, (double)(i + 1) / BarCount);
-
-                int startBin = (int)(startFreq / frequencyPerBin);
-                int endBin = (int)(endFreq / frequencyPerBin);
-
-                if (endBin <= startBin) endBin = startBin + 1;
-                if (endBin >= _fftBuffer.Length / 2) endBin = _fftBuffer.Length / 2 - 1;
-
+                var bin = bins[i];
                 float maxAmplitude = 0;
 
-                // Find max amplitude
-                for (int j = startBin; j < endBin; j++)
+                // Find max amplitude across precomputed bin range
+                for (int j = bin.StartBin; j < bin.EndBin; j++)
                 {
                     float amplitude = (float)Math.Sqrt(_fftBuffer[j].X * _fftBuffer[j].X + _fftBuffer[j].Y * _fftBuffer[j].Y);
                     if (amplitude > maxAmplitude)
                         maxAmplitude = amplitude;
                 }
 
-                float progress = (float)i / BarCount;
-                float linearBoost = 1.0f + (progress * 75.0f);
-                maxAmplitude *= linearBoost;
-
+                maxAmplitude *= bin.LinearBoost;
                 if (maxAmplitude < 0.001f) maxAmplitude = 0.001f;
 
                 float db = 20f * (float)Math.Log10(maxAmplitude);
-
-                float intensity = (db - minDb) / (maxDb - minDb);
+                float intensity = (db - minDb) * invDbRange;
                 intensity = Math.Clamp(intensity, 0f, 1f);
 
-                currentBars[i] = intensity;
+                _currentBars[i] = intensity;
             }
 
             for (int i = 0; i < BarCount; i++)
             {
-                if (currentBars[i] > _barValues[i])
+                if (_currentBars[i] > _barValues[i])
                 {
                     // Jump up quickly
-                    _barValues[i] = currentBars[i];
+                    _barValues[i] = _currentBars[i];
                 }
                 else
                 {
-                    // Fall down slowly
-                    //_barValues[i] = (_barValues[i] * 0.9f) + (currentBars[i] * 0.1f);
-                    _barValues[i] = (_barValues[i] * 0.8f) + (currentBars[i] * 0.2f);
-                    //_barValues[i] = (_barValues[i] * 0.7f) + (currentBars[i] * 0.3f); // could be options for smoothening
-                    //_barValues[i] = (_barValues[i] * 0.6f) + (currentBars[i] * 0.4f);
+                    // Fall down smoothly
+                    _barValues[i] = (_barValues[i] * 0.8f) + (_currentBars[i] * 0.2f);
                 }
             }
         }
@@ -430,36 +482,46 @@ namespace FluentFlyoutWPF.Classes
             if (_bitmap == null)
                 return;
 
-            Application.Current.Dispatcher.InvokeAsync(() =>
+            if (Interlocked.CompareExchange(ref _isRenderingFrame, 1, 0) != 0)
+                return;
+
+            Application.Current?.Dispatcher?.InvokeAsync(() =>
             {
-                lock (_lock)
+                try
                 {
-                    if (_bitmap == null)
-                        return;
-
-                    _bitmap.Lock();
-
-                    try
+                    lock (_lock)
                     {
-                        unsafe
+                        if (_bitmap == null)
+                            return;
+
+                        _bitmap.Lock();
+
+                        try
                         {
-                            IntPtr pBackBuffer = _bitmap.BackBuffer;
-                            int stride = _bitmap.BackBufferStride;
-                            int bufferSize = stride * ImageHeight;
+                            unsafe
+                            {
+                                IntPtr pBackBuffer = _bitmap.BackBuffer;
+                                int stride = _bitmap.BackBufferStride;
+                                int bufferSize = stride * ImageHeight;
 
-                            Span<byte> buffer = new Span<byte>(pBackBuffer.ToPointer(), bufferSize);
+                                Span<byte> buffer = new Span<byte>(pBackBuffer.ToPointer(), bufferSize);
 
-                            buffer.Clear();
+                                buffer.Clear();
 
-                            DrawBars(stride, buffer);
+                                DrawBars(stride, buffer);
+                            }
+
+                            _bitmap.AddDirtyRect(new Int32Rect(0, 0, ImageWidth, ImageHeight));
                         }
-
-                        _bitmap.AddDirtyRect(new Int32Rect(0, 0, ImageWidth, ImageHeight));
+                        finally
+                        {
+                            _bitmap.Unlock();
+                        }
                     }
-                    finally
-                    {
-                        _bitmap.Unlock();
-                    }
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref _isRenderingFrame, 0);
                 }
             }, System.Windows.Threading.DispatcherPriority.Render);
         }

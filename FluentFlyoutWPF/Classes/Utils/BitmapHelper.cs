@@ -291,9 +291,9 @@ internal static class BitmapHelper
             byte[] pixels = new byte[height * stride];
             formattedBitmap.CopyPixels(pixels, stride, 0);
 
-            // downsample pixels
+            // downsample pixels using non-allocating structs
             var rng = new Random();
-            var samples = new List<int[]>();
+            var samples = new List<RgbPixel>(pixels.Length / 40);
 
             for (int i = 0; i < pixels.Length; i += 4)
             {
@@ -305,7 +305,7 @@ internal static class BitmapHelper
                 if (a < 128) continue;
                 if (rng.Next(10) != 0) continue; // sample ~10%
 
-                samples.Add([r, g, b]);
+                samples.Add(new RgbPixel(r, g, b));
             }
 
             List<Color> result;
@@ -319,9 +319,9 @@ internal static class BitmapHelper
 
                 foreach (var pixel in samples)
                 {
-                    float r = pixel[0] / 255f;
-                    float g = pixel[1] / 255f;
-                    float b = pixel[2] / 255f;
+                    float r = pixel.R / 255f;
+                    float g = pixel.G / 255f;
+                    float b = pixel.B / 255f;
 
                     float max = MathF.Max(r, MathF.Max(g, b));
                     float min = MathF.Min(r, MathF.Min(g, b));
@@ -335,9 +335,9 @@ internal static class BitmapHelper
                     // weight by chroma so vivid colors dominate
                     float weight = chroma * chroma;
 
-                    int ri = pixel[0] >> (8 - quantBits);
-                    int gi = pixel[1] >> (8 - quantBits);
-                    int bi = pixel[2] >> (8 - quantBits);
+                    int ri = pixel.R >> (8 - quantBits);
+                    int gi = pixel.G >> (8 - quantBits);
+                    int bi = pixel.B >> (8 - quantBits);
                     histogram[ri * bins * bins + gi * bins + bi] += (int)(weight * 100);
                 }
 
@@ -362,17 +362,23 @@ internal static class BitmapHelper
                 var centroids = samples
                     .OrderBy(_ => rng.Next())
                     .Take(colorCount)
-                    .Select(p => new double[] { p[0], p[1], p[2] })
+                    .Select(p => new double[] { p.R, p.G, p.B })
                     .ToList();
 
-                // k-means iterations
+                double[] sumR = new double[colorCount];
+                double[] sumG = new double[colorCount];
+                double[] sumB = new double[colorCount];
+                int[] counts = new int[colorCount];
+
+                // zero-allocation k-means iterations
                 for (int iter = 0; iter < maxIterations; iter++)
                 {
-                    var clusters = Enumerable.Range(0, colorCount)
-                        .Select(_ => new List<int[]>())
-                        .ToList();
+                    Array.Clear(sumR, 0, colorCount);
+                    Array.Clear(sumG, 0, colorCount);
+                    Array.Clear(sumB, 0, colorCount);
+                    Array.Clear(counts, 0, colorCount);
 
-                    // assign pixels to nearest centroid
+                    // assign pixels to nearest centroid and accumulate directly
                     foreach (var pixel in samples)
                     {
                         int best = 0;
@@ -380,26 +386,29 @@ internal static class BitmapHelper
 
                         for (int i = 0; i < colorCount; i++)
                         {
-                            double dr = pixel[0] - centroids[i][0];
-                            double dg = pixel[1] - centroids[i][1];
-                            double db = pixel[2] - centroids[i][2];
+                            double dr = pixel.R - centroids[i][0];
+                            double dg = pixel.G - centroids[i][1];
+                            double db = pixel.B - centroids[i][2];
                             double dist = dr * dr + dg * dg + db * db;
 
                             if (dist < bestDist) { bestDist = dist; best = i; }
                         }
 
-                        clusters[best].Add(pixel);
+                        sumR[best] += pixel.R;
+                        sumG[best] += pixel.G;
+                        sumB[best] += pixel.B;
+                        counts[best]++;
                     }
 
                     // recalculate centroids + check convergence
                     bool converged = true;
                     for (int i = 0; i < colorCount; i++)
                     {
-                        if (clusters[i].Count == 0) continue;
+                        if (counts[i] == 0) continue;
 
-                        double newR = clusters[i].Average(p => p[0]);
-                        double newG = clusters[i].Average(p => p[1]);
-                        double newB = clusters[i].Average(p => p[2]);
+                        double newR = sumR[i] / counts[i];
+                        double newG = sumG[i] / counts[i];
+                        double newB = sumB[i] / counts[i];
 
                         double dr = newR - centroids[i][0];
                         double dg = newG - centroids[i][1];
@@ -496,4 +505,11 @@ internal static class BitmapHelper
 
     private static byte ToGamma(double v)
         => (byte)Math.Clamp(Math.Pow(v, 1.0 / 2.2) * 255.0, 0, 255);
+
+    private readonly struct RgbPixel(byte r, byte g, byte b)
+    {
+        public readonly byte R = r;
+        public readonly byte G = g;
+        public readonly byte B = b;
+    }
 }
