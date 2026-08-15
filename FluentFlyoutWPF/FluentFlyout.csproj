@@ -16,6 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <ApplicationIcon>Resources\FluentFlyout2.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'GitHub Release'">
     <DefineConstants>GITHUB_RELEASE</DefineConstants>
