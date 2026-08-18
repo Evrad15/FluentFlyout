@@ -453,6 +453,12 @@ public partial class UserSettings : ObservableObject
     public partial int TaskbarWidgetControlsPosition { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether scrolling the mouse wheel over the taskbar widget adjusts system volume.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool TaskbarWidgetMouseWheelVolume { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the taskbar widget should play animations.
     /// </summary>
     [ObservableProperty]
@@ -695,6 +701,7 @@ public partial class UserSettings : ObservableObject
         TaskbarWidgetShowPauseOverlay = true;
         TaskbarWidgetControlsEnabled = false;
         TaskbarWidgetControlsPosition = 1;
+        TaskbarWidgetMouseWheelVolume = true;
         TaskbarWidgetAnimated = true;
         TaskbarVisualizerEnabled = false;
         AppFilteringEnabled = false;

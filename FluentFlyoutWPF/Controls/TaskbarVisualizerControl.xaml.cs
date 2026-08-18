@@ -150,4 +150,20 @@ public partial class TaskbarVisualizerControl : UserControl
         // open settings when clicked
         SettingsWindow.ShowInstance("TaskbarVisualizerPage");
     }
+
+    private void MainBorder_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!SettingsManager.Current.TaskbarWidgetMouseWheelVolume) return;
+
+        if (e.Delta > 0)
+        {
+            TaskbarWidgetControl.AdjustActivePlayerVolume(System.Windows.Application.Current.MainWindow as MainWindow, volumeUp: true);
+            e.Handled = true;
+        }
+        else if (e.Delta < 0)
+        {
+            TaskbarWidgetControl.AdjustActivePlayerVolume(System.Windows.Application.Current.MainWindow as MainWindow, volumeUp: false);
+            e.Handled = true;
+        }
+    }
 }

@@ -12,8 +12,13 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
+using System.Diagnostics;
+using FluentFlyoutWPF.Classes;
 using Windows.Media.Control;
 using Wpf.Ui.Controls;
+using static FluentFlyout.Classes.NativeMethods;
 
 namespace FluentFlyout.Controls;
 
@@ -189,6 +194,114 @@ public partial class TaskbarWidgetControl : UserControl
 
         // toggle main flyout when clicked
         _mainWindow.ShowMediaFlyout(toggleMode: true, forceShow: true);
+    }
+
+    private void MainBorder_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!SettingsManager.Current.TaskbarWidgetMouseWheelVolume) return;
+
+        if (e.Delta > 0)
+        {
+            AdjustActivePlayerVolume(_mainWindow, volumeUp: true);
+            e.Handled = true;
+        }
+        else if (e.Delta < 0)
+        {
+            AdjustActivePlayerVolume(_mainWindow, volumeUp: false);
+            e.Handled = true;
+        }
+    }
+
+    internal static bool AdjustActivePlayerVolume(MainWindow? mainWindow, bool volumeUp, float step = 0.02f)
+    {
+        try
+        {
+            mainWindow ??= System.Windows.Application.Current.MainWindow as MainWindow;
+            var activeSession = mainWindow?.GetActiveMediaSession();
+            if (activeSession == null || string.IsNullOrWhiteSpace(activeSession.Id))
+                return false;
+
+            string mediaId = activeSession.Id;
+
+            // Extract candidate tokens / process names from mediaId (e.g. "Spotify.exe", "SpotifyAB.SpotifyMusic_...!Spotify", "chrome.exe")
+            var tokens = mediaId
+                .Split(['.', '_', '!', ' ', '-', '/', '\\'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(t => t.Trim())
+                .Where(t => !string.Equals(t, "com", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(t, "exe", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(t, "app", StringComparison.OrdinalIgnoreCase)
+                         && t.Length >= 2)
+                .ToList();
+
+            string simpleName = mediaId.Replace(".exe", "", StringComparison.OrdinalIgnoreCase).Trim();
+            if (!tokens.Contains(simpleName, StringComparer.OrdinalIgnoreCase))
+                tokens.Add(simpleName);
+
+            var targetPids = new HashSet<int>();
+            foreach (var token in tokens)
+            {
+                try
+                {
+                    foreach (var p in Process.GetProcessesByName(token))
+                    {
+                        targetPids.Add(p.Id);
+                    }
+                }
+                catch { }
+            }
+
+            var defaultDevice = AudioDeviceMonitor.Instance.GetDefaultRenderDevice();
+            if (defaultDevice == null) return false;
+
+            var sessionManager = defaultDevice.AudioSessionManager;
+            var sessions = sessionManager.Sessions;
+
+            bool sessionUpdated = false;
+
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                var session = sessions[i];
+                if (session.State == AudioSessionState.AudioSessionStateExpired) continue;
+
+                int pid = (int)session.GetProcessID;
+                if (pid == 0) continue;
+
+                bool match = targetPids.Contains(pid);
+
+                if (!match)
+                {
+                    try
+                    {
+                        var proc = Process.GetProcessById(pid);
+                        string procName = proc.ProcessName;
+                        if (tokens.Any(t => procName.Contains(t, StringComparison.OrdinalIgnoreCase) || t.Contains(procName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            match = true;
+                        }
+                    }
+                    catch { }
+                }
+
+                if (match)
+                {
+                    float currentVol = session.SimpleAudioVolume.Volume;
+                    float newVol = Math.Clamp(currentVol + (volumeUp ? step : -step), 0f, 1f);
+                    session.SimpleAudioVolume.Volume = newVol;
+                    if (newVol > 0 && session.SimpleAudioVolume.Mute)
+                    {
+                        session.SimpleAudioVolume.Mute = false;
+                    }
+                    sessionUpdated = true;
+                }
+            }
+
+            return sessionUpdated;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to adjust active player volume");
+            return false;
+        }
     }
 
     public (double logicalWidth, double logicalHeight) CalculateSize(double dpiScale, double? maxAvailableLogicalWidth = null)

@@ -199,6 +199,8 @@ Vous pouvez contribuer aux traductions sur</system:String>
     <system:String x:Key="TaskbarWidgetCloseableFlyoutDescription">Fermer le menu déroulant s'il est déjà ouvert lors du clique sur le widget dans la barre des tâches</system:String>
     <system:String x:Key="TaskbarWidgetControlsPositionTitle">Contrôle de la position des médias</system:String>
     <system:String x:Key="TaskbarWidgetControlsPositionDescription">Choisir où afficher le bouton de contrôle des médias</system:String>
+    <system:String x:Key="TaskbarWidgetMouseWheelVolumeTitle">Contrôle du volume du lecteur à la molette</system:String>
+    <system:String x:Key="TaskbarWidgetMouseWheelVolumeDescription">Faites défiler la molette de la souris sur le widget pour régler le volume de l'application en cours de lecture</system:String>
     <system:String x:Key="PositionLeft">Gauche</system:String>
     <system:String x:Key="PositionRight">Droite</system:String>
     <system:String x:Key="TaskbarVisualizerAudioPeakLevelTitle">Seuil du maximum audio</system:String>
