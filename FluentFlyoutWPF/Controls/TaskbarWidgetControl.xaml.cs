@@ -191,20 +191,30 @@ public partial class TaskbarWidgetControl : UserControl
         _mainWindow.ShowMediaFlyout(toggleMode: true, forceShow: true);
     }
 
-    public (double logicalWidth, double logicalHeight) CalculateSize(double dpiScale)
+    public (double logicalWidth, double logicalHeight) CalculateSize(double dpiScale, double? maxAvailableLogicalWidth = null)
     {
-        // Fixed standard width layout to ensure stable footprint and smooth marquee scrolling
-        double textWidth = 130;
-        double logicalWidth = 192;
+        // Standard compact width layout (95px text width) to ensure stable footprint and smooth marquee scrolling
+        double defaultTextWidth = 95;
+        double baseNonTextLogicalWidth = 55; // album art (36) + margins (4 + 6 + 4 + border padding ~5)
+        double controlsLogicalWidth = SettingsManager.Current.TaskbarWidgetControlsEnabled ? 90 : 0; // 3 x 28px buttons + margin ~90
 
-        if (SettingsManager.Current.TaskbarWidgetControlsEnabled)
+        double textWidth = defaultTextWidth;
+        double minTextWidth = 30;
+
+        if (maxAvailableLogicalWidth.HasValue)
         {
-            logicalWidth = 294;
+            double availableForText = maxAvailableLogicalWidth.Value - baseNonTextLogicalWidth - controlsLogicalWidth;
+            if (availableForText < defaultTextWidth)
+            {
+                textWidth = Math.Max(minTextWidth, availableForText);
+            }
         }
 
-        if (SongTitle.Width != textWidth) SongTitle.Width = textWidth;
-        if (SongArtist.Width != textWidth) SongArtist.Width = textWidth;
-        if (SongInfoStackPanel.Width != textWidth) SongInfoStackPanel.Width = textWidth;
+        double logicalWidth = baseNonTextLogicalWidth + textWidth + controlsLogicalWidth;
+
+        if (Math.Abs(SongTitle.Width - textWidth) > 0.5) SongTitle.Width = textWidth;
+        if (Math.Abs(SongArtist.Width - textWidth) > 0.5) SongArtist.Width = textWidth;
+        if (Math.Abs(SongInfoStackPanel.Width - textWidth) > 0.5) SongInfoStackPanel.Width = textWidth;
 
         double logicalHeight = 40; // default height
 

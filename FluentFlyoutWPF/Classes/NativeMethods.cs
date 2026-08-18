@@ -51,7 +51,13 @@ public static partial class NativeMethods
     internal const int WM_SETTINGCHANGE = 0x001A;
 
     // Shell Hook Messages
+    internal const int HSHELL_WINDOWCREATED = 1;
+    internal const int HSHELL_WINDOWDESTROYED = 2;
+    internal const int HSHELL_ACTIVATESHELLWINDOW = 3;
+    internal const int HSHELL_WINDOWACTIVATED = 4;
+    internal const int HSHELL_REDRAW = 6;
     internal const int HSHELL_APPCOMMAND = 12;
+    internal const int HSHELL_RUDEAPPACTIVATED = 0x8004;
 
     // App Command Messages
     internal const int APPCOMMAND_VOLUME_MUTE = 8;

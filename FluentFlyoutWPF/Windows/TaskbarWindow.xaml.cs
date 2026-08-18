@@ -35,6 +35,7 @@ public partial class TaskbarWindow : Window
     private AutomationElement? _taskbarFrameElement;
     private AutomationElement? _startElement;
     private AutomationElement? _searchElement;
+    private AutomationElement? _taskListElement;
     // reference to main window for flyout functions
     private MainWindow? _mainWindow;
     private int _lastSelectedMonitor = -1;
@@ -272,7 +273,7 @@ on_error:
             Logger.Error("Taskbar Widget error during window region reset.");
     }
 
-    private void UpdatePosition()
+    internal void UpdatePosition()
     {
         if (MainWindow.ExplorerRestarting)
         {
@@ -520,13 +521,69 @@ on_error:
                     }
                 }
 
+                int leftBoundary = startOffset;
                 if (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 0)
                 {
                     primaryPos = startOffset + visualizerPhysicalWidth + 4;
+                    leftBoundary = primaryPos;
                 }
                 else
                 {
                     primaryPos = startOffset;
+                }
+
+                // Dynamic collision avoidance & repulsion against expanding taskbar app buttons (e.g. centered Start / app group in Windows 11)
+                if (!isLeftAligned)
+                {
+                    try
+                    {
+                        (bool startFound, Rect startRect) = GetStartButtonRect(taskbarHandle);
+                        if (startFound && !startRect.IsEmpty)
+                        {
+                            // Extent of the centered apps left edge relative to taskbar
+                            double startExtent = isVertical
+                                ? (startRect.Top - taskbarRect.Top)
+                                : (startRect.Left - taskbarRect.Left);
+
+                            // The Start button in centered mode is located to the right of leftBoundary
+                            if (startExtent > leftBoundary)
+                            {
+                                int safeGap = 8;
+                                int extraVisualizer = (SettingsManager.Current.TaskbarVisualizerEnabled && SettingsManager.Current.TaskbarVisualizerPosition == 1)
+                                    ? visualizerPhysicalWidth + 4
+                                    : 0;
+
+                                int totalGroupWidth = physicalWidth + extraVisualizer;
+                                int appsLeftLimit = (int)startExtent;
+
+                                if (primaryPos + totalGroupWidth > appsLeftLimit - safeGap)
+                                {
+                                    // Repulsion: push the widget group to the left away from the expanding apps
+                                    primaryPos = (appsLeftLimit - safeGap) - totalGroupWidth;
+
+                                    if (primaryPos < leftBoundary)
+                                    {
+                                        // Pushed all the way against the left boundary (e.g. weather widget or screen margin)
+                                        primaryPos = leftBoundary;
+
+                                        // Available space is constrained: dynamically compress widget
+                                        int availablePhysicalWidth = (appsLeftLimit - safeGap) - leftBoundary - extraVisualizer;
+                                        if (availablePhysicalWidth > 0)
+                                        {
+                                            double availableLogicalWidth = availablePhysicalWidth / (dpiScale * _scale);
+                                            var (dynLogicalWidth, dynLogicalHeight) = Widget.CalculateSize(dpiScale, availableLogicalWidth);
+                                            physicalWidth = (int)(dynLogicalWidth * dpiScale * _scale);
+                                            physicalHeight = (int)(dynLogicalHeight * dpiScale);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn(ex, "Failed to calculate dynamic app avoidance in taskbar.");
+                    }
                 }
                 break;
 
@@ -967,5 +1024,13 @@ on_error:
     private (bool, Rect) GetTaskbarFrameRect(IntPtr taskbarHandle)
     {
         return GetTaskbarXamlElementRect(taskbarHandle, ref _taskbarFrameElement, "TaskbarFrame");
+    }
+
+    private (bool, Rect) GetTaskListRect(IntPtr taskbarHandle)
+    {
+        var result = GetTaskbarXamlElementRect(taskbarHandle, ref _taskListElement, "TaskListButtonPanel");
+        if (result.Item1 && result.Item2 != Rect.Empty)
+            return result;
+        return GetTaskbarXamlElementRect(taskbarHandle, ref _taskListElement, "RunningApplications");
     }
 }

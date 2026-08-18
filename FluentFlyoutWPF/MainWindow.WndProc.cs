@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2024-2026 The FluentFlyout Authors
+// Copyright (c) 2024-2026 The FluentFlyout Authors
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 using FluentFlyout.Classes;
@@ -67,6 +67,14 @@ public partial class MainWindow
             bool result = TryShowMediaFlyoutDebounced();
             if (result) handled = true;
         }
+        else if (msg == WM_SHELLHOOK)
+        {
+            int code = (int)wParam;
+            if (code == HSHELL_WINDOWCREATED || code == HSHELL_WINDOWDESTROYED || code == HSHELL_REDRAW || code == HSHELL_WINDOWACTIVATED || code == HSHELL_RUDEAPPACTIVATED)
+            {
+                TriggerTaskbarPositionUpdateDebounced();
+            }
+        }
         else if (msg == WM_TASKBARCREATED)
         {
             Logger.Warn("Explorer restart detected (TaskbarCreated)");
@@ -134,5 +142,20 @@ public partial class MainWindow
         {
             Logger.Error(ex, "Failed to recreate tray icon safely");
         }
+    }
+
+    private long _lastTaskbarUpdateTime = 0;
+
+    private void TriggerTaskbarPositionUpdateDebounced()
+    {
+        long currentTime = Environment.TickCount64;
+        if ((currentTime - _lastTaskbarUpdateTime) < 250) // 250ms debounce
+            return;
+
+        _lastTaskbarUpdateTime = currentTime;
+        taskbarWindow?.Dispatcher.BeginInvoke(() =>
+        {
+            taskbarWindow?.UpdatePosition();
+        }, DispatcherPriority.Background);
     }
 }

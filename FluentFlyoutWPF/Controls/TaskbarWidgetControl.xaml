@@ -34,15 +34,15 @@
                             </Border.Background>
                         </Border>
 
-                        <StackPanel Name="SongInfoStackPanel" Orientation="Vertical" VerticalAlignment="Center" Width="130" Margin="8,0,0,0" 
+                        <StackPanel Name="SongInfoStackPanel" Orientation="Vertical" VerticalAlignment="Center" Width="95" Margin="6,0,0,0" 
                                     ToolTipService.InitialShowDelay="800"
                                     ToolTipService.Placement="RelativePoint"
                                     ToolTipService.VerticalOffset="-16">
-                            <local:MarqueeTextBlock x:Name="SongTitle" Text="" FontWeight="Normal" Height="18" Width="130" />
-                            <local:MarqueeTextBlock x:Name="SongArtist" Text="" FontWeight="Normal" TextOpacity="0.5" Height="16" Width="130" Margin="0,-1.5,0,0" />
+                            <local:MarqueeTextBlock x:Name="SongTitle" Text="" FontWeight="Normal" Height="18" Width="95" />
+                            <local:MarqueeTextBlock x:Name="SongArtist" Text="" FontWeight="Normal" TextOpacity="0.5" Height="16" Width="95" Margin="0,-1.5,0,0" />
                         </StackPanel>
 
-                        <StackPanel Name="ControlsStackPanel" Orientation="Horizontal" VerticalAlignment="Center" Width="Auto" Margin="6,0,0,0">
+                        <StackPanel Name="ControlsStackPanel" Orientation="Horizontal" VerticalAlignment="Center" Width="Auto" Margin="4,0,0,0">
                             <StackPanel.Style>
                                 <Style TargetType="StackPanel">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -53,9 +53,9 @@
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
-                            <ui:Button Name="PreviousButton" Appearance="Transparent" Icon="{ui:SymbolIcon Previous20, Filled=True}" Height="32" Width="32" Padding="0" BorderThickness="0" Margin="0,0,0,-1" Click="Previous_Click"/>
-                            <ui:Button Name="PlayPauseButton" Appearance="Transparent" Icon="{ui:SymbolIcon Pause16, Filled=True}" Height="32" Width="32" Padding="0" BorderThickness="0" Margin="0,0,0,-1" Click="PlayPause_Click"/>
-                            <ui:Button Name="NextButton" Appearance="Transparent" Icon="{ui:SymbolIcon Next20, Filled=True}" Height="32" Width="32" Padding="0" BorderThickness="0" Margin="0,0,0,-1" Click="Next_Click"/>
+                            <ui:Button Name="PreviousButton" Appearance="Transparent" Icon="{ui:SymbolIcon Previous20, Filled=True}" Height="28" Width="28" Padding="0" BorderThickness="0" Margin="0,0,0,-1" Click="Previous_Click"/>
+                            <ui:Button Name="PlayPauseButton" Appearance="Transparent" Icon="{ui:SymbolIcon Pause16, Filled=True}" Height="28" Width="28" Padding="0" BorderThickness="0" Margin="0,0,0,-1" Click="PlayPause_Click"/>
+                            <ui:Button Name="NextButton" Appearance="Transparent" Icon="{ui:SymbolIcon Next20, Filled=True}" Height="28" Width="28" Padding="0" BorderThickness="0" Margin="0,0,0,-1" Click="Next_Click"/>
                         </StackPanel>
 
                     </StackPanel>
